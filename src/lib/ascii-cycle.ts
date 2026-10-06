@@ -13,14 +13,20 @@ export interface GlyphCycle {
   nextAt: number;
 }
 
+function cycleSeed(index: number, turn: number): number {
+  const seed =
+    Math.imul(index + 1, 0x9e3779b1) ^ Math.imul(turn + 1, 0x85ebca6b);
+  const mixed = Math.imul(seed ^ (seed >>> 16), 0x7feb352d);
+  return (mixed ^ (mixed >>> 15)) >>> 0;
+}
+
 /** Deterministic jitter varies both cells and successive beats, without RNG. */
 export function cycleInterval(
   index: number,
   turn: number,
   settings: CycleSettings,
 ): number {
-  const seed =
-    (Math.imul(index + 1, 1103515245) ^ Math.imul(turn + 1, 12345)) >>> 0;
+  const seed = cycleSeed(index, turn);
   return (
     settings.cycleMinMs +
     (seed % (settings.cycleMaxMs - settings.cycleMinMs + 1))
@@ -57,10 +63,14 @@ export function advanceGlyphCycle(
     };
   if (time < state.nextAt) return state;
   const turn = state.turn + 1;
+  // Independent symbol choices never repeat the current state.
+  const alternatives = family.filter((character) => character !== state.to);
+  const replacement =
+    alternatives[cycleSeed(index, turn) % alternatives.length] ?? state.to;
   // A late timer advances just once, never bursts through missed beats.
   return {
     from: state.to,
-    to: family[(family.indexOf(state.to) + 1) % family.length] ?? state.to,
+    to: replacement,
     turn,
     changedAt: time,
     nextAt: time + cycleInterval(index, turn, settings),

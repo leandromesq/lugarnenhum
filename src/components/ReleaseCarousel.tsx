@@ -8,6 +8,7 @@ import type {
   TransitionEvent,
 } from "react";
 import type { Release } from "@/data/band";
+import { DiscFace } from "@/components/DiscFace";
 import { rebaseCursor, selectionSteps, wrapIndex } from "@/lib/carousel";
 
 interface ReleaseCarouselProps {
@@ -232,7 +233,7 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
                 >
                   <button
                     type="button"
-                    className={`disc disc--edition-${index % 3}`}
+                    className={`disc disc--edition-${index % 6}`}
                     data-slot={slot}
                     data-active={active}
                     data-side={
@@ -249,14 +250,7 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
                     aria-pressed={exposed ? active : undefined}
                     tabIndex={exposed ? 0 : -1}
                   >
-                    <span className="disc__artist">
-                      LUGAR
-                      <br />
-                      NENHUM
-                    </span>
-                    <span className="disc__format">{item.duration}</span>
-                    <span className="disc__hub" aria-hidden="true" />
-                    <span className="disc__title">{item.title}</span>
+                    <DiscFace title={item.title} duration={item.duration} />
                   </button>
                 </div>
               );

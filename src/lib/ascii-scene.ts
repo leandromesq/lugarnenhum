@@ -11,31 +11,31 @@ export const asciiScene = {
   radius: 55,
   enterMs: 100,
   leaveMs: 220,
-  cycleMinMs: 400,
-  cycleMaxMs: 700,
-  cycleFadeMs: 150,
-  cycleCoreRatio: 0.6,
+  cycleMinMs: 180,
+  cycleMaxMs: 360,
+  cycleFadeMs: 80,
+  cycleCoreRatio: 0.8,
   /** Outer band of the interaction radius that eases the lens into the rest. */
   softEdge: 11,
   characters: ".+-#:*=%@",
 } as const;
 
-/**
- * Density-similar replacement targets. A cell only ever swaps within its own
- * family, so a dot becomes a colon or middle dot rather than an `@`.
- */
-export const hoverTargets: Readonly<Record<string, readonly string[]>> = {
-  ".": [":", "·"],
-  ":": [".", "·"],
-  "·": [".", ":"],
-  "-": [":", "·"],
-  "+": ["*", "="],
-  "*": ["+", "="],
-  "=": ["+", "*"],
-  "#": ["%", "@"],
-  "%": ["#", "@"],
-  "@": ["#", "%"],
-};
+/** Broader glitch alphabets retain approximate density without flashing. */
+const hoverFamilies = [
+  [".", ":", "·", ",", ";", "'", "`", "-", "_"],
+  ["+", "*", "=", "~", "/", "\\", "|", "<", ">", "!", "?"],
+  ["#", "%", "@", "&", "$", "{", "}", "[", "]"],
+] as const;
+
+export const hoverTargets: Readonly<Record<string, readonly string[]>> =
+  Object.fromEntries(
+    hoverFamilies.flatMap((family) =>
+      family.map((character) => [
+        character,
+        family.filter((alternative) => alternative !== character),
+      ]),
+    ),
+  );
 
 export interface Point {
   x: number;

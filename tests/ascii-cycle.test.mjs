@@ -15,12 +15,12 @@ import {
 const advance = (state, active, time) =>
   advanceGlyphCycle(state, hoverTargets["."], 3, active, time, asciiScene);
 
-test("Periodic intervals vary between cells and beats, within 400–700ms", () => {
+test("Glitch intervals vary independently between cells and beats, within 180–360ms", () => {
   const intervals = new Set();
   for (let index = 0; index < 20; index++)
     for (let turn = 0; turn < 5; turn++) {
       const interval = cycleInterval(index, turn, asciiScene);
-      assert.ok(interval >= 400 && interval <= 700);
+      assert.ok(interval >= 180 && interval <= 360);
       assert.equal(interval, cycleInterval(index, turn, asciiScene));
       intervals.add(interval);
     }
@@ -36,8 +36,8 @@ test("A core glyph holds its state, then crossfades to a similar character", () 
   assert.notEqual(changed.to, changed.from);
   assert.ok(hoverTargets["."].includes(changed.to));
   assert.equal(cycleBlend(changed, changed.changedAt, asciiScene), 0);
-  assert.equal(cycleBlend(changed, changed.changedAt + 75, asciiScene), 0.5);
-  assert.equal(cycleBlend(changed, changed.changedAt + 150, asciiScene), 1);
+  assert.equal(cycleBlend(changed, changed.changedAt + 40, asciiScene), 0.5);
+  assert.equal(cycleBlend(changed, changed.changedAt + 80, asciiScene), 1);
 });
 
 test("Leaving the core cancels beats, lets a fade finish and never catches up in bursts", () => {
@@ -46,7 +46,7 @@ test("Leaving the core cancels beats, lets a fade finish and never catches up in
   const stopped = advance(changed, false, changed.changedAt + 30);
   assert.equal(stopped.nextAt, Infinity);
   assert.equal(advance(stopped, false, 99999), stopped);
-  assert.equal(cycleBlend(stopped, changed.changedAt + 150, asciiScene), 1);
+  assert.equal(cycleBlend(stopped, changed.changedAt + 80, asciiScene), 1);
   const resumed = advance(stopped, true, 100000);
   assert.ok(resumed.nextAt > 100000);
   assert.equal(advance(resumed, true, 200000).turn, resumed.turn + 1);

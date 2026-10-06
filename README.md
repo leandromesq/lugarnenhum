@@ -16,9 +16,12 @@ Páginas: `/`, `/musica/`, `/loja/`, `/quem-somos/` e `/presskit/`.
 - `src/data/band.ts`: anúncio, biografia provisória, navegação e lançamentos. Adicione `listenUrl` aos lançamentos quando os links oficiais estiverem disponíveis.
 - `src/components/SiteShell.tsx`: estrutura compartilhada das páginas.
 - `src/components/ReleaseCarousel.tsx`: trilho contínuo dos CDs com seleção responsiva, perspectiva, teclado, gestos e lista de faixas expansível.
+- `src/components/MobiusModel.tsx`: modelo GLB na home, carregamento sob demanda, giro inicial lento e fidget com arraste/toque, momentum e fricção. Hover não pausa; após 3s sem interação volta suavemente à pose e ao giro padrão. Setas giram e Escape para. Respeita movimento reduzido, sem botão.
+- `src/lib/mobius-physics.ts`: direção, velocidade de arraste e integração da inércia independente da taxa de quadros.
+- `src/components/DiscFace.tsx`: logo, título e duração sobre os seis acabamentos iridescentes do Pencil; Inter Medium Italic hospedada localmente só nos rótulos.
 - `src/components/BandPhoto.tsx`: fotografias distintas para desktop e celular.
 - `src/components/AsciiOverlay.tsx`: ASCII interativo em Canvas, com fallback SVG, cache da cena estática e respeito a movimento reduzido.
-- `src/lib/ascii-cycle.ts`: alternância suave de caracteres no centro do hover, com intervalos independentes de 400–700ms e pausa entre transições.
+- `src/lib/ascii-cycle.ts`: glitch localizado com mais símbolos, escolhas e intervalos independentes de 180–360ms, transições de 80ms e pausa entre transições.
 - `src/lib/ascii-scene.ts`: coordenadas da foto original, projeção `cover` e lente radial. Foto e ASCII compartilham a escala e o recorte; não posicione os caracteres com unidades independentes de viewport.
 - `src/components/Announcement.tsx`: faixa de anúncio com rolagem contínua e pausa somente ao passar o mouse, sem botão.
 - `src/components/SiteFooter.tsx`: Instagram oficial e presskit, sem contatos inventados.
@@ -52,7 +55,7 @@ Para regenerar WebP e ícones a partir dos arquivos de imagem exportados pelo Pe
 node scripts/prepare-design-assets.mjs "caminho/para/lugarnenhum-assets"
 ```
 
-A fonte Roboto Mono é hospedada localmente, com sua licença em `src/app/fonts/LICENSE.txt`. A tipografia de interface usa Consolas com fallback para Courier New.
+As fontes são hospedadas localmente: Roboto Mono com licença em `src/app/fonts/LICENSE.txt`, e Inter nos rótulos dos CDs com licença em `src/app/fonts/Inter-LICENSE.txt`. A tipografia de interface usa Consolas com fallback para Courier New.
 
 ## Hospedagem
 

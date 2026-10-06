@@ -26,7 +26,7 @@ test("ASCII responds locally to the mouse and returns to the original scene", as
   await expect.poll(() => raster(page)).toBe(original);
 });
 
-test("Hovered ASCII alternates slowly under a stationary pointer and restores on exit", async ({
+test("Hovered ASCII glitches asynchronously under a stationary pointer and restores on exit", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -47,10 +47,10 @@ test("Hovered ASCII alternates slowly under a stationary pointer and restores on
   expect(hovered).not.toBe(original);
   const states = new Set([hovered]);
   for (let sample = 0; sample < 6; sample++) {
-    await page.clock.runFor(250);
+    await page.clock.runFor(120);
     states.add(await raster(page));
   }
-  expect(states.size).toBeGreaterThan(1);
+  expect(states.size).toBeGreaterThan(3);
   // Stay inside the page, but leave the characters' interaction radius.
   await page.mouse.move(1700, 800);
   await page.clock.runFor(1000);

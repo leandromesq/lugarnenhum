@@ -99,10 +99,10 @@ test("Rim softness eases the outer band into the rest of the scene", () => {
   }
 });
 
-test("Initial hovered replacements stay within their density family", () => {
-  assert.deepEqual(hoverTargets["."], [":", "·"]);
-  assert.deepEqual(hoverTargets["+"], ["*", "="]);
-  assert.deepEqual(hoverTargets["#"], ["%", "@"]);
+test("Glitch replacements use richer alphabets while keeping approximate density", () => {
+  for (const character of [".", "+", "#"])
+    assert.ok(hoverTargets[character].length >= 8);
+  assert.ok(new Set(Object.values(hoverTargets).flat()).size >= 25);
   for (const [character, family] of Object.entries(hoverTargets)) {
     assert.ok(family.length > 0, `${character} has no family`);
     for (let index = 0; index < 24; index++) {

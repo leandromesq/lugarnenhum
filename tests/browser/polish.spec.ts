@@ -76,6 +76,14 @@ test("Secondary links contain only the confirmed Instagram and presskit", async 
   await expect(
     footer.getByRole("link", { name: "PRESSKIT", exact: true }),
   ).toHaveAttribute("href", "/presskit/");
+  const bounds = await footer.boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(bounds!.x).toBeGreaterThan(viewport.width / 2);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+  await expect(page.locator(".site-shell--home .site-footer")).toHaveCSS(
+    "background-color",
+    "rgba(8, 9, 9, 0.82)",
+  );
   await footer.getByRole("link", { name: "PRESSKIT", exact: true }).click();
   await expect(page).toHaveURL(/\/presskit\/$/);
   await expect(
@@ -144,4 +152,55 @@ test("Desktop biography keeps the composition without a text shadow", async ({
     return parseFloat(style.lineHeight) / parseFloat(style.fontSize);
   });
   expect(ratio).toBeCloseTo(1.4, 1);
+});
+
+test("The six Pencil finishes retain their ordered colours, logo and song labels", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/musica/");
+  const colours = [
+    "#a6cced",
+    "#4bd268",
+    "#cdcbcb",
+    "#c5da5f",
+    "#83c0aa",
+    "#ff94df",
+  ];
+  for (let index = 0; index < releases.length; index++) {
+    const disc = page.locator('.disc[aria-pressed="true"]');
+    await expect(disc).toHaveClass(new RegExp(`disc--edition-${index}`));
+    await expect(disc.locator(".disc__title")).toHaveText(
+      releases[index].title,
+    );
+    await expect(disc.locator(".disc__format")).toHaveText(
+      releases[index].duration,
+    );
+    const style = await disc.evaluate((element) => ({
+      colour: getComputedStyle(element)
+        .getPropertyValue("--disc-light-a")
+        .trim(),
+      coating: getComputedStyle(element, "::before").mixBlendMode,
+      hub: getComputedStyle(element.querySelector(".disc__hub")!)
+        .backgroundImage,
+    }));
+    expect(style.colour).toBe(colours[index]);
+    expect(style.coating).toBe("hue");
+    expect(style.hub).toContain("linear-gradient");
+    await expect(disc.locator(".disc__title")).toHaveCSS(
+      "font-style",
+      "italic",
+    );
+    await expect(disc.locator(".disc__title")).toHaveCSS("font-weight", "500");
+    await expect
+      .poll(() =>
+        disc
+          .locator(".disc__wordmark img")
+          .evaluate(
+            (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+          ),
+      )
+      .toBe(true);
+    await page.getByRole("button", { name: "Próximo lançamento" }).click();
+  }
 });
