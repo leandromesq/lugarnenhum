@@ -1,7 +1,6 @@
 import { BandPhoto } from "@/components/BandPhoto";
 import { SiteShell } from "@/components/SiteShell";
 import { AsciiOverlay } from "@/components/AsciiOverlay";
-import { MobiusModel } from "@/components/MobiusModel";
 
 export default function HomePage() {
   return (
@@ -12,7 +11,6 @@ export default function HomePage() {
         <AsciiOverlay />
       </div>
       <div className="home-fade" aria-hidden="true" />
-      <MobiusModel />
     </SiteShell>
   );
 }

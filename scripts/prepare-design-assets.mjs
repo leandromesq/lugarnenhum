@@ -30,7 +30,10 @@ await prepareBrandAssets(brandSource, target);
 console.log("Prepared official light/dark symbols and wordmarks");
 
 const icon = await sharp(join(target, "symbol.webp"))
-  .resize(64, 64, { fit: "contain", background: "#080909" })
+  .resize(64, 64, {
+    fit: "contain",
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  })
   .png()
   .toBuffer();
 await writeFile("src/app/icon.png", icon);

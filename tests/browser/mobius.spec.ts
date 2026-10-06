@@ -24,6 +24,44 @@ test("The real 3D model loads above the menu without pause buttons", async ({
   await expect(page.locator(".mobius")).toHaveCount(0);
 });
 
+test("Desktop model is centered above the menu while mobile positioning stays unchanged", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.evaluate(() => document.fonts.ready);
+  for (const width of [768, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    // Chromium updates viewport-unit styles on the next frame. Read both boxes
+    // atomically after that update, not on opposite sides of a resize frame.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+    const { model, menu } = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const rect = document.querySelector(selector)!.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      };
+      return { model: box(".mobius"), menu: box(".site-navigation") };
+    });
+    expect(
+      Math.abs(model.x + model.width / 2 - menu.x - menu.width / 2),
+    ).toBeLessThan(1);
+    expect(menu.y - model.y - model.height).toBeCloseTo(18, 0);
+    expect(model.x).toBeGreaterThanOrEqual(0);
+    expect(model.x + model.width).toBeLessThanOrEqual(width);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".mobius")).toHaveCSS("position", "fixed");
+  await expect(page.locator(".site-navigation")).toHaveCSS("position", "fixed");
+  const mobile = (await page.locator(".mobius").boundingBox())!;
+  expect(mobile.width).toBe(100);
+  expect(mobile.x + mobile.width).toBeCloseTo(390 * 0.95, 0);
+});
+
 test("First pointer interaction has no square focus border; keyboard focus stays visible", async ({
   page,
 }) => {

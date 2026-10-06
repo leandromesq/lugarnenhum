@@ -4,6 +4,7 @@ import { Brand } from "@/components/Brand";
 import { SiteNavigation } from "@/components/SiteNavigation";
 import { Announcement } from "@/components/Announcement";
 import { SiteFooter } from "@/components/SiteFooter";
+import { MobiusModel } from "@/components/MobiusModel";
 
 interface SiteShellProps {
   children: ReactNode;
@@ -23,7 +24,14 @@ export function SiteShell({ children, variant }: SiteShellProps) {
       <main id="conteudo" tabIndex={-1}>
         {children}
       </main>
-      <SiteNavigation />
+      {variant === "home" ? (
+        <div className="home-navigation">
+          <MobiusModel />
+          <SiteNavigation />
+        </div>
+      ) : (
+        <SiteNavigation />
+      )}
       <SiteFooter presskit={variant === "presskit"} />
     </div>
   );
