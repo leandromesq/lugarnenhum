@@ -93,6 +93,7 @@ test("Idle restores the default spin, but never resets a held model", async ({
 }) => {
   const canvas = await ready(page);
   await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
   await canvas.hover();
   await page.mouse.down();
   await page.mouse.up();
