@@ -13,25 +13,30 @@ import { rebaseCursor, selectionSteps, wrapIndex } from "@/lib/carousel";
 interface ReleaseCarouselProps {
   releases: readonly Release[];
 }
-
 interface TrackState {
   cursor: number;
+  start: number;
   moving: boolean;
+  rebasing: boolean;
 }
 
 export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
   const count = releases.length;
+  const initial = count > 1 ? count : 0;
   const [track, setTrack] = useState<TrackState>({
-    cursor: count > 1 ? count : 0,
+    cursor: initial,
+    start: initial,
     moving: false,
+    rebasing: false,
   });
   const trackState = useRef(track);
   const pendingSteps = useRef(0);
   const frame = useRef(0);
-  const rebasing = useRef(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
-  const pointerStart = useRef<number | null>(null);
+  const pointerStart = useRef<{ x: number; y: number; id: number } | null>(
+    null,
+  );
   const didSwipe = useRef(false);
   const activeIndex = wrapIndex(track.cursor, count);
   const release = releases[activeIndex];
@@ -43,31 +48,33 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
   }
 
   function advance() {
+    const current = trackState.current;
+    if (current.rebasing || !pendingSteps.current || count < 2) return;
+    // Finish a clone-boundary crossing before rebasing. Within the middle copy,
+    // retarget the ongoing CSS transition immediately instead of queuing steps.
     if (
-      trackState.current.moving ||
-      rebasing.current ||
-      !pendingSteps.current ||
-      count < 2
+      current.moving &&
+      (current.cursor < count || current.cursor >= count * 2)
     )
       return;
+    const steps = pendingSteps.current;
+    pendingSteps.current = 0;
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const cursor = rebaseCursor(
-        trackState.current.cursor + pendingSteps.current,
-        count,
-      );
-      pendingSteps.current = 0;
-      update({ cursor, moving: false });
+      const cursor = rebaseCursor(current.cursor + steps, count);
+      update({ cursor, start: cursor, moving: false, rebasing: false });
       settle();
       return;
     }
-    const step = Math.sign(pendingSteps.current);
-    pendingSteps.current -= step;
-    update({ cursor: trackState.current.cursor + step, moving: true });
+    update({
+      cursor: current.cursor + steps,
+      start: current.moving ? current.start : current.cursor,
+      moving: true,
+      rebasing: false,
+    });
   }
 
   function move(steps: number) {
     pendingSteps.current += steps;
-    // Coalesce full queued laps so rapid inputs do not create a long backlog.
     if (count > 1) pendingSteps.current %= count;
     advance();
   }
@@ -83,19 +90,18 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
   function settle() {
     const cursor = rebaseCursor(trackState.current.cursor, count);
     const focusWasOnDisc = railRef.current?.contains(document.activeElement);
-    rebasing.current = true;
-    update({ cursor, moving: false });
-    // The clone and its central counterpart have identical neighbours. Rebase
-    // without animation, then let a queued input start on the following paint.
+    cancelAnimationFrame(frame.current);
+    update({ cursor, start: cursor, moving: false, rebasing: true });
+    // Offscreen copies have identical neighbours. Paint the unanimated rebase
+    // before enabling hover transitions or applying the latest queued intent.
     frame.current = requestAnimationFrame(() => {
-      if (focusWasOnDisc) {
+      if (focusWasOnDisc)
         railRef.current
-          ?.querySelector<HTMLButtonElement>(`[data-slot="${cursor}"]`)
+          ?.querySelector<HTMLButtonElement>(`.disc[data-slot="${cursor}"]`)
           ?.focus({ preventScroll: true });
-      }
       frame.current = requestAnimationFrame(() => {
         frame.current = 0;
-        rebasing.current = false;
+        update({ ...trackState.current, rebasing: false });
         advance();
       });
     });
@@ -111,6 +117,13 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      (event.target as HTMLElement).closest(".tracklist")
+    )
+      return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
       move(event.key === "ArrowRight" ? 1 : -1);
@@ -118,21 +131,19 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
   }
 
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
-    if (pointerStart.current === null) return;
-    const distance = event.clientX - pointerStart.current;
+    const start = pointerStart.current;
+    if (!start || start.id !== event.pointerId) return;
     pointerStart.current = null;
-    if (Math.abs(distance) > 45) {
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
       didSwipe.current = true;
-      move(distance < 0 ? 1 : -1);
+      move(dx < 0 ? 1 : -1);
     }
   }
 
-  useEffect(() => {
-    return () => cancelAnimationFrame(frame.current);
-  }, []);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
-  // Native non-passive listener: consume horizontal scrolling only, leaving
-  // ordinary vertical page scrolling intact. A gesture advances one step.
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -144,7 +155,7 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
         accumulated = 0;
         return;
       }
-      accumulated += event.deltaX;
+      accumulated += event.deltaX * (event.deltaMode === 1 ? 16 : 1);
       if (Math.abs(accumulated) >= 50) {
         move(Math.sign(accumulated));
         accumulated = 0;
@@ -163,6 +174,8 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
   });
 
   if (!release) return <p className="music-empty">Novas músicas em breve.</p>;
+  const visibleStart = Math.min(track.start, track.cursor) - 1;
+  const visibleEnd = Math.max(track.start, track.cursor) + 1;
 
   return (
     <section
@@ -175,8 +188,14 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
         className="disc-stage"
         ref={stageRef}
         onPointerDown={(event) => {
-          pointerStart.current = event.clientX;
-          didSwipe.current = false;
+          if (event.isPrimary && event.button === 0) {
+            pointerStart.current = {
+              x: event.clientX,
+              y: event.clientY,
+              id: event.pointerId,
+            };
+            didSwipe.current = false;
+          }
         }}
         onPointerUp={handlePointerUp}
         onPointerCancel={() => {
@@ -194,6 +213,7 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
           className="disc-track"
           ref={railRef}
           data-moving={track.moving}
+          data-rebasing={track.rebasing}
           style={{ "--cursor": track.cursor } as CSSProperties}
           onTransitionEnd={handleTransitionEnd}
         >
@@ -215,7 +235,14 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
                     className={`disc disc--edition-${index % 3}`}
                     data-slot={slot}
                     data-active={active}
-                    data-visible={Math.abs(slot - track.cursor) <= 1}
+                    data-side={
+                      slot < track.cursor
+                        ? "left"
+                        : slot > track.cursor
+                          ? "right"
+                          : "center"
+                    }
+                    data-visible={slot >= visibleStart && slot <= visibleEnd}
                     onClick={() => select(index)}
                     aria-label={`Selecionar ${item.title}`}
                     aria-hidden={!exposed || undefined}
@@ -265,22 +292,45 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
           aria-live="polite"
           aria-atomic="true"
         >
-          <h2>{release.title}</h2>
-          <p>
-            {release.format} · {release.duration} · {release.status}
-          </p>
-          {release.listenUrl && (
-            <a
-              className="text-link"
-              href={release.listenUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              OUVIR AGORA ↗
-            </a>
-          )}
+          <div className="release-details__transition" key={release.id}>
+            <h2>{release.title}</h2>
+            <p>
+              {release.format} · {release.duration} · {release.status}
+            </p>
+            {release.listenUrl && (
+              <a
+                className="text-link"
+                href={release.listenUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                OUVIR AGORA ↗
+              </a>
+            )}
+          </div>
         </div>
         <p className="carousel-hint">ESCOLHA UM CD. EXPLORE O SINAL.</p>
+        <details className="tracklist">
+          <summary>VER FAIXAS</summary>
+          <ol>
+            {releases.map((item, index) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => select(index)}
+                  aria-label={`Ir para ${item.title}`}
+                  aria-pressed={index === activeIndex}
+                >
+                  <span className="tracklist__number" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span>{item.title}</span>
+                  <span className="tracklist__duration">{item.duration}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </details>
       </div>
     </section>
   );

@@ -11,7 +11,7 @@ export default function ShopPage() {
       <section className="shop-coming-soon">
         <Image
           className="shop-symbol"
-          src={assetPath("/assets/pencil/symbol.webp")}
+          src={assetPath("/assets/pencil/symbol-dark.webp")}
           alt=""
           loading="eager"
           width={600}
@@ -23,7 +23,7 @@ export default function ShopPage() {
         <p className="shop-note">
           Estamos preparando as próximas peças.
           <br />
-          Volte daqui a pouco.
+          Acompanhe as novidades no Instagram.
         </p>
       </section>
     </SiteShell>

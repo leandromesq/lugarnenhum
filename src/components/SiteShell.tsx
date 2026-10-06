@@ -3,6 +3,7 @@ import { band } from "@/data/band";
 import { Brand } from "@/components/Brand";
 import { SiteNavigation } from "@/components/SiteNavigation";
 import { Announcement } from "@/components/Announcement";
+import { SiteFooter } from "@/components/SiteFooter";
 
 interface SiteShellProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ export function SiteShell({ children, variant }: SiteShellProps) {
         {children}
       </main>
       <SiteNavigation />
+      <SiteFooter presskit={variant === "presskit"} />
     </div>
   );
 }

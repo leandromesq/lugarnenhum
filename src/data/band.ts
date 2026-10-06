@@ -4,15 +4,15 @@ export const band = {
   announcement:
     "OUÇA AGORA: EP BESORRO FM - DISPONÍVEL EM TODAS AS PLATAFORMAS DE STREAMING",
   biography: [
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla felis  urna, vestibulum sed pretium sed, accumsan sit amet erat. Fusce dictum  ipsum eu turpis fringilla, a auctor neque scelerisque. Suspendisse  tempor diam a magna luctus, et fermentum velit ornare. Fusce id quam ac  elit ullamcorper maximus eget ac magna. Ut tempor dolor sed scelerisque  convallis. Aenean quis luctus lacus, vel efficitur augue. Cras viverra  erat quis purus maximus facilisis. Maecenas eu neque nisi. Quisque  auctor lectus et laoreet volutpat. Proin nec maximus neque.",
+    "lugar nenhum é uma banda de dream pop noise rock post punk midwest emo slowcore neo psychedelia indie sleaze lo-fi nugaze sophisti-pop ethereal wave drone glitch power eletronics free improvisation shoegaze Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla felis  urna, vestibulum sed pretium sed, accumsan sit amet erat. Fusce dictum  ipsum eu turpis fringilla, a auctor neque scelerisque. Suspendisse  tempor diam a magna luctus, et fermentum velit ornare. Fusce id quam ac  elit ullamcorper maximus eget ac magna. Ut tempor dolor sed scelerisque  convallis.",
     "Nunc semper pharetra nunc vitae sodales. Fusce neque mi, maximus  lobortis mi sit amet, efficitur euismod neque. Vestibulum ornare quam in ante elementum, ut maximus lectus suscipit. Cras id sollicitudin mi.  Praesent congue vitae nulla vel ornare. Donec vitae odio vel lacus  interdum tristique non placerat nisi. Quisque volutpat quam eu enim  feugiat molestie. Vestibulum ornare dolor a tellus mattis feugiat.",
   ],
 };
 
 export const navigation = [
-  { href: "/musica", label: "OUÇA NOSSA MÚSICA" },
-  { href: "/loja", label: "NOSSA LOJA" },
-  { href: "/quem-somos", label: "QUEM SOMOS" },
+  { href: "/musica", label: "OUÇA NOSSA MÚSICA", shortLabel: "MÚSICA" },
+  { href: "/loja", label: "NOSSA LOJA", shortLabel: "LOJA" },
+  { href: "/quem-somos", label: "QUEM SOMOS", shortLabel: "SOBRE" },
 ] as const;
 
 export interface Release {

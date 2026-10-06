@@ -19,7 +19,7 @@ test("The entire CD track slides left with the selected disc centered", async ({
         slots.map((slot) => {
           const rect = document
             .querySelector(`[data-slot="${slot}"]`)!
-            .getBoundingClientRect();
+            .parentElement!.getBoundingClientRect();
           return rect.x + rect.width / 2;
         }),
       [startSlot, startSlot + 1],

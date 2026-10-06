@@ -32,10 +32,10 @@ for (const route of ["/", "/musica/", "/loja/", "/quem-somos/", "/presskit/"]) {
 
 test("Main navigation works and the logo returns home", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "NOSSA LOJA", exact: false }).click();
+  await page.getByRole("link", { name: /^(NOSSA )?LOJA$/ }).click();
   await expect(page).toHaveURL(/\/loja\/$/);
   await expect(
-    page.getByRole("link", { name: "NOSSA LOJA", exact: false }),
+    page.getByRole("link", { name: /^(NOSSA )?LOJA$/ }),
   ).toHaveAttribute("aria-current", "page");
   await page
     .getByRole("link", { name: "Lugar Nenhum, página inicial" })

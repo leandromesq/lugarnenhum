@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 
 interface AnnouncementProps {
@@ -8,10 +5,8 @@ interface AnnouncementProps {
 }
 
 export function Announcement({ text }: AnnouncementProps) {
-  const [paused, setPaused] = useState(false);
-
   return (
-    <header className="announcement" data-paused={paused}>
+    <header className="announcement">
       <Link className="announcement__link" href="/musica" aria-label={text}>
         <span className="announcement__track" aria-hidden="true">
           {[0, 1].map((group) => (
@@ -22,15 +17,6 @@ export function Announcement({ text }: AnnouncementProps) {
           ))}
         </span>
       </Link>
-      <button
-        type="button"
-        className="announcement__pause"
-        aria-label={paused ? "Retomar anúncio" : "Pausar anúncio"}
-        aria-pressed={paused}
-        onClick={() => setPaused((value) => !value)}
-      >
-        <span aria-hidden="true">{paused ? "▶" : "Ⅱ"}</span>
-      </button>
     </header>
   );
 }

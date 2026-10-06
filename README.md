@@ -15,11 +15,13 @@ Páginas: `/`, `/musica/`, `/loja/`, `/quem-somos/` e `/presskit/`.
 
 - `src/data/band.ts`: anúncio, biografia provisória, navegação e lançamentos. Adicione `listenUrl` aos lançamentos quando os links oficiais estiverem disponíveis.
 - `src/components/SiteShell.tsx`: estrutura compartilhada das páginas.
-- `src/components/ReleaseCarousel.tsx`: interação dos CDs, com teclado e gestos.
+- `src/components/ReleaseCarousel.tsx`: trilho contínuo dos CDs com seleção responsiva, perspectiva, teclado, gestos e lista de faixas expansível.
 - `src/components/BandPhoto.tsx`: fotografias distintas para desktop e celular.
 - `src/components/AsciiOverlay.tsx`: ASCII interativo em Canvas, com fallback SVG, cache da cena estática e respeito a movimento reduzido.
+- `src/lib/ascii-cycle.ts`: alternância suave de caracteres no centro do hover, com intervalos independentes de 400–700ms e pausa entre transições.
 - `src/lib/ascii-scene.ts`: coordenadas da foto original, projeção `cover` e lente radial. Foto e ASCII compartilham a escala e o recorte; não posicione os caracteres com unidades independentes de viewport.
-- `src/components/Announcement.tsx`: faixa de anúncio com rolagem contínua e controle de pausa.
+- `src/components/Announcement.tsx`: faixa de anúncio com rolagem contínua e pausa somente ao passar o mouse, sem botão.
+- `src/components/SiteFooter.tsx`: Instagram oficial e presskit, sem contatos inventados.
 - `src/app/globals.css`: tokens e composição responsiva do design.
 - `public/assets/pencil/`: fotos e logos otimizados em WebP.
 - `PRODUCT.md` e `DESIGN.md`: referência de produto e identidade visual.
@@ -44,7 +46,7 @@ npm run test:browser
 
 ## Assets do design
 
-Para regenerar WebP e ícones a partir dos arquivos de imagem exportados pelo Pencil:
+Para regenerar WebP e ícones a partir dos arquivos de imagem exportados pelo Pencil (incluindo `symbol-dark.webp`, que muda apenas as cores neutras e preserva os bonecos):
 
 ```sh
 node scripts/prepare-design-assets.mjs "caminho/para/lugarnenhum-assets"

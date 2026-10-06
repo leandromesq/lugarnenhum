@@ -26,7 +26,7 @@ test("ASCII responds locally to the mouse and returns to the original scene", as
   await expect.poll(() => raster(page)).toBe(original);
 });
 
-test("Hovered ASCII settles on one replacement and restores after leaving the radius", async ({
+test("Hovered ASCII alternates slowly under a stationary pointer and restores on exit", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -45,11 +45,17 @@ test("Hovered ASCII settles on one replacement and restores after leaving the ra
   await page.clock.runFor(1000);
   const hovered = await raster(page);
   expect(hovered).not.toBe(original);
-  await page.clock.runFor(1000);
-  expect(await raster(page)).toBe(hovered);
+  const states = new Set([hovered]);
+  for (let sample = 0; sample < 6; sample++) {
+    await page.clock.runFor(250);
+    states.add(await raster(page));
+  }
+  expect(states.size).toBeGreaterThan(1);
   // Stay inside the page, but leave the characters' interaction radius.
   await page.mouse.move(1700, 800);
   await page.clock.runFor(1000);
+  expect(await raster(page)).toBe(original);
+  await page.clock.runFor(2000);
   expect(await raster(page)).toBe(original);
 });
 
@@ -88,7 +94,7 @@ test("ASCII and photo use the same responsive viewport", async ({
   }
 });
 
-test("TV announcement scrolls and has a working pause control", async ({
+test("TV announcement scrolls, pauses on hover, and resumes when the pointer leaves", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -96,7 +102,11 @@ test("TV announcement scrolls and has a working pause control", async ({
     "The approved mobile design has no announcement banner.",
   );
   await page.goto("/");
+  const announcement = page.locator(".announcement");
   const track = page.locator(".announcement__track");
+  // Pause is hover only; focus does not override the pointer leaving.
+  await expect(announcement.locator("button")).toHaveCount(0);
+  await page.mouse.move(900, 600);
   const initial = await track.evaluate(
     (element) => getComputedStyle(element).transform,
   );
@@ -105,16 +115,22 @@ test("TV announcement scrolls and has a working pause control", async ({
       track.evaluate((element) => getComputedStyle(element).transform),
     )
     .not.toBe(initial);
-  await page.getByRole("button", { name: "Pausar anúncio" }).click();
-  await expect(page.locator(".announcement")).toHaveAttribute(
-    "data-paused",
-    "true",
-  );
+  await page.mouse.move(400, 20);
   await expect(track).toHaveCSS("animation-play-state", "paused");
-  await page.getByRole("button", { name: "Retomar anúncio" }).click();
-  await page.mouse.move(400, 500);
-  await page.locator("main").focus();
+  const frozen = await track.evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  await page.waitForTimeout(400);
+  expect(
+    await track.evaluate((element) => getComputedStyle(element).transform),
+  ).toBe(frozen);
+  await page.mouse.move(900, 600);
   await expect(track).toHaveCSS("animation-play-state", "running");
+  await expect
+    .poll(() =>
+      track.evaluate((element) => getComputedStyle(element).transform),
+    )
+    .not.toBe(frozen);
 });
 
 test("Reduced motion keeps the announcement and ASCII static", async ({
@@ -135,7 +151,15 @@ test("Reduced motion keeps the announcement and ASCII static", async ({
     "animation-name",
     "none",
   );
-  await expect(
-    page.getByRole("button", { name: "Pausar anúncio" }),
-  ).toBeHidden();
+  await expect(page.locator(".announcement button")).toHaveCount(0);
+});
+
+test("Approved mobile home keeps the portrait without ASCII or announcement", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Mobile composition check.");
+  await page.goto("/");
+  await expect(page.locator(".ascii-layer")).toBeHidden();
+  await expect(page.locator("canvas.home-ascii")).toBeHidden();
+  await expect(page.locator(".announcement")).toBeHidden();
 });

@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { createDarkSymbol } from "./create-symbol-variant.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 
@@ -24,6 +25,12 @@ for (const [input, name, width] of assets) {
     .toFile(join(target, `${name}.webp`));
   console.log(`Prepared ${name}.webp`);
 }
+
+await createDarkSymbol(
+  join(target, "symbol.webp"),
+  join(target, "symbol-dark.webp"),
+);
+console.log("Prepared symbol-dark.webp");
 
 const icon = await sharp(join(target, "symbol.webp"))
   .resize(64, 64, { fit: "contain", background: "#080909" })
