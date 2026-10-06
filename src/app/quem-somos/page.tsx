@@ -6,13 +6,16 @@ import { band } from "@/data/band";
 
 export const metadata: Metadata = { title: "Quem somos" };
 
-function Biography({ duplicate = false }: { duplicate?: boolean }) {
+function Biography({
+  paragraphs,
+  side,
+}: {
+  paragraphs: readonly string[];
+  side: "left" | "right";
+}) {
   return (
-    <div
-      className={`biography ${duplicate ? "biography--right" : "biography--left"}`}
-      aria-hidden={duplicate || undefined}
-    >
-      {band.biography.map((paragraph, index) => (
+    <div className={`biography biography--${side}`}>
+      {paragraphs.map((paragraph, index) => (
         <p key={index}>{paragraph}</p>
       ))}
     </div>
@@ -20,6 +23,7 @@ function Biography({ duplicate = false }: { duplicate?: boolean }) {
 }
 
 export default function AboutPage() {
+  const split = Math.ceil(band.biography.length / 2);
   return (
     <SiteShell variant="about">
       <h1 className="sr-only">Quem somos: Lugar Nenhum</h1>
@@ -29,8 +33,8 @@ export default function AboutPage() {
         className="about-copy"
         aria-label="Sobre a banda, texto provisório"
       >
-        <Biography />
-        <Biography duplicate />
+        <Biography side="left" paragraphs={band.biography.slice(0, split)} />
+        <Biography side="right" paragraphs={band.biography.slice(split)} />
       </section>
     </SiteShell>
   );

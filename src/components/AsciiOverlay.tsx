@@ -10,8 +10,7 @@ import {
   projectPoint,
   hoverCharacter,
   hoverTargets,
-  stepHoverAmount,
-  rimSoftness,
+  lensMask,
 } from "@/lib/ascii-scene";
 import type { Point } from "@/lib/ascii-scene";
 import {
@@ -23,9 +22,6 @@ import {
 const glyphs = buildGlyphs(homeAscii);
 const lines = homeAscii.split("\n");
 
-/** Below this residual the lens snaps exactly, so the RAF loop can stop. */
-const INTENSITY_EPSILON = 0.002;
-
 export function AsciiOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -35,7 +31,10 @@ export function AsciiOverlay() {
     const context = canvas.getContext("2d");
     const cached = document.createElement("canvas");
     const cachedContext = cached.getContext("2d");
-    if (!context || !cachedContext) return;
+    const inactiveLayer = document.createElement("canvas");
+    const inactiveContext = inactiveLayer.getContext("2d");
+    if (!context || !cachedContext || !inactiveContext) return;
+    let inactiveReady = false;
 
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const desktop = matchMedia("(min-width: 768px)");
@@ -45,8 +44,7 @@ export function AsciiOverlay() {
     let frame = 0;
     let wakeTimer = 0;
     let lastTime = 0;
-    let intensity = 0;
-    const hoverProgress = new Float32Array(glyphs.length);
+    const hoverProgress = new Uint8Array(glyphs.length);
     let cycles = glyphs.map((glyph) =>
       createGlyphCycle(hoverCharacter(glyph.character, glyph.index)),
     );
@@ -62,11 +60,11 @@ export function AsciiOverlay() {
     let pointer = { x: -1000, y: -1000 };
     let target = { ...pointer };
 
-    function paintBase() {
+    function paintBase(layer = cached) {
       if (!context) return;
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(0, 0, canvas!.width, canvas!.height);
-      context.drawImage(cached, 0, 0);
+      context.drawImage(layer, 0, 0);
     }
 
     function rebuild() {
@@ -79,8 +77,15 @@ export function AsciiOverlay() {
         2,
         4096 / Math.max(rect.width, rect.height),
       );
-      canvas!.width = cached.width = Math.round(rect.width * pixelRatio);
-      canvas!.height = cached.height = Math.round(rect.height * pixelRatio);
+      canvas!.width =
+        cached.width =
+        inactiveLayer.width =
+          Math.round(rect.width * pixelRatio);
+      canvas!.height =
+        cached.height =
+        inactiveLayer.height =
+          Math.round(rect.height * pixelRatio);
+      inactiveReady = false;
       const transform = coverTransform(rect.width, rect.height);
       const style = getComputedStyle(canvas!);
       family = style.fontFamily;
@@ -140,49 +145,29 @@ export function AsciiOverlay() {
       const delta = Math.min(lastTime ? time - lastTime : 16, 64);
       lastTime = time;
       const smoothing = 1 - Math.exp(-delta / 75);
-      const wanted = inside ? 1 : 0;
-      intensity += (wanted - intensity) * smoothing;
       pointer.x += (target.x - pointer.x) * smoothing;
       pointer.y += (target.y - pointer.y) * smoothing;
 
-      // Bounded float epsilon: once the radial/fractional residue is inside it,
-      // snap exactly so the loop settles instead of redrawing forever.
+      // Only smooth pointer tracking; activation and the circle edge are dry.
       const pointerEpsilon = Math.max(0.5, radius * 0.005);
       let settling = false;
       if (
+        !inside ||
         Math.hypot(target.x - pointer.x, target.y - pointer.y) <= pointerEpsilon
       ) {
         pointer = { x: target.x, y: target.y };
       } else {
         settling = true;
       }
-      if (Math.abs(wanted - intensity) <= INTENSITY_EPSILON) {
-        intensity = wanted;
-      } else {
-        settling = true;
-      }
-
-      const padding = fontSize * 2;
-      let left = Infinity;
-      let top = Infinity;
-      let right = -Infinity;
-      let bottom = -Infinity;
       let nextBeat = Infinity;
       for (const glyph of projected) {
         const centerX = glyph.x + fontSize * 0.3;
         const centerY = glyph.y + baseline - fontSize * 0.35;
         // Activation, cycling and deformation share the same smoothed center.
         const distance = Math.hypot(centerX - pointer.x, centerY - pointer.y);
-        const wantedAmount = inside ? rimSoftness(distance, radius) : 0;
-        const stepped = stepHoverAmount(
-          hoverProgress[glyph.index],
-          wantedAmount,
-          delta,
-        );
-        const settled = Math.abs(stepped - wantedAmount) <= 0.001;
-        const progress = settled ? wantedAmount : stepped;
+        const progress = inside ? lensMask(distance, radius) : 0;
+        if (hoverProgress[glyph.index] !== progress) inactiveReady = false;
         hoverProgress[glyph.index] = progress;
-        if (!settled) settling = true;
         let cycle = cycles[glyph.index];
         if (
           progress === 0 &&
@@ -207,71 +192,62 @@ export function AsciiOverlay() {
         if (progress > 0) {
           if (cycleBlend(cycle, time, asciiScene) < 1) settling = true;
           nextBeat = Math.min(nextBeat, cycle.nextAt);
-          left = Math.min(left, glyph.x - padding);
-          top = Math.min(top, glyph.y - padding);
-          right = Math.max(right, glyph.x + padding);
-          bottom = Math.max(bottom, glyph.y + padding);
         }
       }
-      // The lens reaches beyond any tracked cell; keep its whole radius clipped.
-      if (intensity > 0) {
-        const reach = radius + padding;
-        left = Math.min(left, pointer.x - reach);
-        top = Math.min(top, pointer.y - reach);
-        right = Math.max(right, pointer.x + reach);
-        bottom = Math.max(bottom, pointer.y + reach);
-      }
-      paintBase();
-      if (Number.isFinite(left)) {
-        const width = right - left;
-        const height = bottom - top;
+      if (!inside) paintBase();
+      else {
+        // Cache only inactive cells. Active originals are absent, not covered
+        // or circularly clipped; character beats redraw only the small lens.
+        if (!inactiveReady) {
+          inactiveContext!.setTransform(1, 0, 0, 1, 0, 0);
+          inactiveContext!.clearRect(
+            0,
+            0,
+            inactiveLayer.width,
+            inactiveLayer.height,
+          );
+          inactiveContext!.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+          inactiveContext!.font = `${fontSize}px ${family}`;
+          inactiveContext!.fillStyle = color;
+          inactiveContext!.textBaseline = "alphabetic";
+          inactiveContext!.shadowColor = color;
+          inactiveContext!.shadowBlur = glow;
+          for (const glyph of projected) {
+            if (!hoverProgress[glyph.index])
+              inactiveContext!.fillText(
+                glyph.character,
+                glyph.x,
+                glyph.y + baseline,
+              );
+          }
+          inactiveReady = true;
+        }
+        paintBase(inactiveLayer);
         context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         context.save();
-        context.beginPath();
-        context.rect(left, top, width, height);
-        context.clip();
-        context.clearRect(left, top, width, height);
         context.fillStyle = color;
         context.textBaseline = "alphabetic";
         context.shadowColor = color;
         context.shadowBlur = glow;
         for (const glyph of projected) {
-          if (
-            glyph.x < left - padding ||
-            glyph.x > right + padding ||
-            glyph.y < top - padding ||
-            glyph.y > bottom + padding
-          )
-            continue;
+          if (!hoverProgress[glyph.index]) continue;
           const center = {
             x: glyph.x + fontSize * 0.3,
             y: glyph.y + baseline - fontSize * 0.35,
           };
-          const lens = distortPoint(center, pointer, radius, intensity);
-          const progress = hoverProgress[glyph.index];
-          // Animate the radial amount itself; multiplying by the current rim
-          // would erase the character instantly when the pointer leaves it.
-          const blend = progress * progress * (3 - 2 * progress);
+          const lens = distortPoint(center, pointer, radius, 1);
           const x = glyph.x + lens.x - center.x;
           const y = glyph.y + baseline + lens.y - center.y;
-          const slide = fontSize * 0.1;
           context.font = `${fontSize * lens.zoom}px ${family}`;
-          if (blend < 1) {
-            context.globalAlpha = 1 - blend;
-            context.fillText(glyph.character, x, y - slide * blend);
+          const cycle = cycles[glyph.index];
+          const pulse = cycleBlend(cycle, time, asciiScene);
+          if (pulse < 1) {
+            context.globalAlpha = 1 - pulse;
+            context.fillText(cycle.from, x, y);
           }
-          if (blend > 0) {
-            const cycle = cycles[glyph.index];
-            const pulse = cycleBlend(cycle, time, asciiScene);
-            const hoverY = y + slide * (1 - blend);
-            if (pulse < 1) {
-              context.globalAlpha = blend * (1 - pulse);
-              context.fillText(cycle.from, x, hoverY);
-            }
-            if (pulse > 0) {
-              context.globalAlpha = blend * pulse;
-              context.fillText(cycle.to, x, hoverY);
-            }
+          if (pulse > 0) {
+            context.globalAlpha = pulse;
+            context.fillText(cycle.to, x, y);
           }
           context.globalAlpha = 1;
         }
@@ -289,8 +265,8 @@ export function AsciiOverlay() {
 
     function reset() {
       inside = false;
-      intensity = 0;
       hoverProgress.fill(0);
+      inactiveReady = false;
       cycles = glyphs.map((glyph) =>
         createGlyphCycle(hoverCharacter(glyph.character, glyph.index)),
       );
@@ -317,7 +293,7 @@ export function AsciiOverlay() {
         x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
       if (nextInside) {
         target = { x, y };
-        if (!inside && intensity < 0.005) pointer = { ...target };
+        if (!inside) pointer = { ...target };
       }
       inside = nextInside;
       schedule();

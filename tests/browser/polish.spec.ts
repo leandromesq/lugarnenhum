@@ -154,6 +154,34 @@ test("Desktop biography keeps the composition without a text shadow", async ({
   expect(ratio).toBeCloseTo(1.4, 1);
 });
 
+test("Official brand assets use dedicated black and white files without shop inversion", async ({
+  page,
+}) => {
+  await page.goto("/loja/");
+  await expect(page.locator(".shop-symbol")).toHaveAttribute(
+    "src",
+    /\/symbol-dark\.webp$/,
+  );
+  await expect(page.locator(".brand__wordmark img")).toHaveAttribute(
+    "src",
+    /\/wordmark-dark\.webp$/,
+  );
+  expect(
+    await page
+      .locator(".brand__wordmark")
+      .evaluate((element) => getComputedStyle(element).filter),
+  ).toBe("none");
+  await page.goto("/");
+  await expect(page.locator(".brand__symbol")).toHaveAttribute(
+    "src",
+    /\/symbol\.webp$/,
+  );
+  await expect(page.locator(".brand__wordmark img")).toHaveAttribute(
+    "src",
+    /\/wordmark\.webp$/,
+  );
+});
+
 test("The six Pencil finishes retain their ordered colours, logo and song labels", async ({
   page,
 }) => {

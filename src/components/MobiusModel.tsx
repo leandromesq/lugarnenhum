@@ -46,6 +46,13 @@ export function MobiusModel() {
   } | null>(null);
   const instruction = useId();
   const [status, setStatus] = useState("loading");
+  const [hintDismissed, setHintDismissed] = useState(false);
+
+  useEffect(() => {
+    if (status !== "ready" || hintDismissed) return;
+    const timer = window.setTimeout(() => setHintDismissed(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, [status, hintDismissed]);
 
   useEffect(() => {
     const element = host.current!;
@@ -57,14 +64,45 @@ export function MobiusModel() {
     let release: (() => void) | undefined;
     let wake: (() => void) | undefined;
     const motion = matchMedia("(prefers-reduced-motion: reduce)");
+    // Pointer-triggered programmatic focus can trip the browser's focus-visible
+    // heuristic on first interaction. Keep our keyboard indicator independent.
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Tab") surface.dataset.focusInput = "keyboard";
+      },
+      { capture: true, signal: abort.signal },
+    );
 
     async function initialize() {
       try {
-        const [THREE, { GLTFLoader }, { RoomEnvironment }] = await Promise.all([
+        const [
+          THREE,
+          { GLTFLoader },
+          { RoomEnvironment },
+          { EffectComposer },
+          { RenderPass },
+          { OutlinePass },
+          { OutputPass },
+        ] = await Promise.all([
           import("three"),
           import("three/addons/loaders/GLTFLoader.js"),
           import("three/addons/environments/RoomEnvironment.js"),
+          import("three/addons/postprocessing/EffectComposer.js"),
+          import("three/addons/postprocessing/RenderPass.js"),
+          import("three/addons/postprocessing/OutlinePass.js"),
+          import("three/addons/postprocessing/OutputPass.js"),
         ]);
+        if (disposed) return;
+        // Fail missing downloads before allocating a context or baking lighting.
+        const response = await fetch(
+          assetPath("/assets/models/mobius-strip.glb"),
+          {
+            signal: abort.signal,
+          },
+        );
+        if (!response.ok) throw new Error("Model could not be loaded");
+        const modelBytes = await response.arrayBuffer();
         if (disposed) return;
         const renderer = new THREE.WebGLRenderer({
           canvas: surface,
@@ -89,6 +127,67 @@ export function MobiusModel() {
         const light = new THREE.DirectionalLight(0xf5f5f5, 3);
         light.position.set(3, 4, 5);
         scene.add(light);
+        // Everything is composited in one RGBA float buffer so the canvas stays
+        // transparent: the beauty pass clears to alpha 0, OutlinePass adds the
+        // white contour with additive blending (alpha accumulates with it) and
+        // OutputPass copies the result over the canvas without blending.
+        const composer = new EffectComposer(
+          renderer,
+          new THREE.WebGLRenderTarget(1, 1, {
+            type: THREE.HalfFloatType,
+            samples: 4,
+          }),
+        );
+        const renderPass = new RenderPass(scene, camera);
+        renderPass.clearAlpha = 0;
+        const outlinePass = new OutlinePass(
+          new THREE.Vector2(1, 1),
+          scene,
+          camera,
+        );
+        outlinePass.visibleEdgeColor.setHex(0xffffff);
+        outlinePass.hiddenEdgeColor.setHex(0xffffff);
+        outlinePass.edgeStrength = 1;
+        outlinePass.edgeThickness = 1;
+        outlinePass.downSampleRatio = 1;
+        outlinePass.pulsePeriod = 0;
+        outlinePass.edgeGlow = 0;
+        // OutlinePass normally blurs even with edgeGlow=0. Copy its detected
+        // edges instead, then composite a binary white stroke with alpha 0/1.
+        // No shader/package fork: customize the pass's exposed materials.
+        outlinePass.separableBlurMaterial1.fragmentShader = `
+          uniform sampler2D colorTexture;
+          varying vec2 vUv;
+          void main() { gl_FragColor = texture2D(colorTexture, vUv); }
+        `;
+        outlinePass.edgeDetectionMaterial.uniforms.strokePixels = {
+          value: 1.5 * renderer.getPixelRatio(),
+        };
+        outlinePass.edgeDetectionMaterial.fragmentShader =
+          outlinePass.edgeDetectionMaterial.fragmentShader
+            .replace(
+              "uniform vec2 texSize;",
+              "uniform vec2 texSize; uniform float strokePixels;",
+            )
+            .replace(
+              "vec2 invSize = 1.0 / texSize;",
+              "vec2 invSize = strokePixels / texSize;",
+            );
+        outlinePass.overlayMaterial.fragmentShader = `
+          uniform sampler2D maskTexture;
+          uniform sampler2D edgeTexture1;
+          varying vec2 vUv;
+          void main() {
+            float exterior = step(0.5, texture2D(maskTexture, vUv).r);
+            float edge = step(0.01, texture2D(edgeTexture1, vUv).a);
+            float stroke = exterior * edge;
+            gl_FragColor = vec4(vec3(stroke), stroke);
+          }
+        `;
+        const outputPass = new OutputPass();
+        composer.addPass(renderPass);
+        composer.addPass(outlinePass);
+        composer.addPass(outputPass);
         const content: {
           model?: Object3D;
           pivot?: Object3D;
@@ -197,13 +296,15 @@ export function MobiusModel() {
               moving = Math.hypot(velocity.x, velocity.y) > 0;
             }
           }
-          renderer.render(scene, camera);
+          composer.render(delta);
           if (moving) schedule();
           else previous = 0;
         }
         function resize() {
           const size = element.clientWidth;
+          if (size <= 0) return;
           renderer.setSize(size, size, false);
+          composer.setSize(size, size);
           schedule();
         }
         function down(event: PointerEvent) {
@@ -214,6 +315,7 @@ export function MobiusModel() {
             !event.isPrimary
           )
             return;
+          surface.dataset.focusInput = "pointer";
           event.preventDefault();
           cancelReturn();
           surface.focus({ preventScroll: true });
@@ -321,6 +423,7 @@ export function MobiusModel() {
           { signal: abort.signal },
         );
         release = () => {
+          if (released) return;
           released = true;
           cancelReturn();
           cancelAnimationFrame(frame);
@@ -330,16 +433,17 @@ export function MobiusModel() {
           pointer = null;
           if (content.model) disposeModel(content.model);
           environment.dispose();
+          // Dispose passes before the next frame can draw: every FullScreenQuad
+          // shares one module-level geometry, so Pass.dispose() releases it for
+          // all of them at once.
+          outlinePass.dispose();
+          outputPass.dispose();
+          composer.dispose();
           renderer.dispose();
           actions.current = null;
         };
-        const response = await fetch(
-          assetPath("/assets/models/mobius-strip.glb"),
-          { signal: abort.signal },
-        );
-        if (!response.ok) throw new Error("Model could not be loaded");
         const gltf = await new GLTFLoader().parseAsync(
-          await response.arrayBuffer(),
+          modelBytes,
           assetPath("/assets/models/"),
         );
         if (disposed || released) {
@@ -359,6 +463,7 @@ export function MobiusModel() {
         content.homePose = group.quaternion.clone();
         content.pivot = group;
         scene.add(group);
+        outlinePass.selectedObjects = [model];
         setStatus("ready");
         schedule();
       } catch {
@@ -390,7 +495,12 @@ export function MobiusModel() {
   }, []);
 
   return (
-    <div className="mobius" ref={host} data-state={status}>
+    <div
+      className="mobius"
+      ref={host}
+      data-state={status}
+      onPointerDownCapture={() => setHintDismissed(true)}
+    >
       <canvas
         ref={canvas}
         tabIndex={0}
@@ -398,6 +508,8 @@ export function MobiusModel() {
         aria-label="Faixa de Möbius 3D interativa"
         aria-describedby={instruction}
         onKeyDown={(event) => {
+          setHintDismissed(true);
+          event.currentTarget.dataset.focusInput = "keyboard";
           const rotations: Record<string, [number, number]> = {
             ArrowLeft: [0, -0.2],
             ArrowRight: [0, 0.2],
@@ -414,6 +526,11 @@ export function MobiusModel() {
           }
         }}
       />
+      {status === "ready" && !hintDismissed && (
+        <p className="mobius__hint" aria-hidden="true">
+          Arraste para girar
+        </p>
+      )}
       <span id={instruction} className="sr-only">
         Arraste e solte para girar com impulso. Use as setas do teclado para
         girar e Escape para parar.

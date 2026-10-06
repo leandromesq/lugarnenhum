@@ -1,13 +1,15 @@
 import sharp from "sharp";
-import { createDarkSymbol } from "./create-symbol-variant.mjs";
+import { prepareBrandAssets } from "./prepare-brand-assets.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
 
 const source = process.argv[2];
 if (!source)
   throw new Error(
-    "Usage: node scripts/prepare-design-assets.mjs <Pencil assets directory>",
+    "Usage: node scripts/prepare-design-assets.mjs <Pencil assets directory> [official logos directory]",
   );
+// Official logos live beside the .pen file, not among the older image imports.
+const brandSource = process.argv[3] ?? dirname(resolve(source));
 const target = resolve("public/assets/pencil");
 await mkdir(target, { recursive: true });
 const assets = [
@@ -15,8 +17,6 @@ const assets = [
   ["image-import-4.jpg", "home-mobile", 1080],
   ["image-import-5.jpg", "about-desktop", 2200],
   ["image-import-7.jpg", "about-mobile", 1080],
-  ["image-import-11.png", "wordmark", 900],
-  ["image-import-10.png", "symbol", 600],
 ];
 for (const [input, name, width] of assets) {
   await sharp(join(source, input))
@@ -26,11 +26,8 @@ for (const [input, name, width] of assets) {
   console.log(`Prepared ${name}.webp`);
 }
 
-await createDarkSymbol(
-  join(target, "symbol.webp"),
-  join(target, "symbol-dark.webp"),
-);
-console.log("Prepared symbol-dark.webp");
+await prepareBrandAssets(brandSource, target);
+console.log("Prepared official light/dark symbols and wordmarks");
 
 const icon = await sharp(join(target, "symbol.webp"))
   .resize(64, 64, { fit: "contain", background: "#080909" })

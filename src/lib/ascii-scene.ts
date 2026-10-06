@@ -9,14 +9,10 @@ export const asciiScene = {
   columnAdvance: 14.52,
   rowAdvance: 25.92,
   radius: 55,
-  enterMs: 100,
-  leaveMs: 220,
   cycleMinMs: 180,
   cycleMaxMs: 360,
   cycleFadeMs: 80,
   cycleCoreRatio: 0.8,
-  /** Outer band of the interaction radius that eases the lens into the rest. */
-  softEdge: 11,
   characters: ".+-#:*=%@",
 } as const;
 
@@ -102,39 +98,9 @@ export function hoverCharacter(
   return alternatives[(index * 7 + turn) % alternatives.length];
 }
 
-export function stepHover(
-  progress: number,
-  active: boolean,
-  deltaMs: number,
-): number {
-  return stepHoverAmount(progress, active ? 1 : 0, deltaMs);
-}
-
-/** Animate a radial amount, including its return after the pointer leaves. */
-export function stepHoverAmount(
-  progress: number,
-  target: number,
-  deltaMs: number,
-): number {
-  const bounded = Math.max(0, Math.min(1, target));
-  const duration = bounded > progress ? asciiScene.enterMs : asciiScene.leaveMs;
-  const step = Math.max(0, deltaMs) / duration;
-  return bounded > progress
-    ? Math.min(bounded, progress + step)
-    : Math.max(bounded, progress - step);
-}
-
-/**
- * Rim softness for the outer `softEdge` pixels: 1 across the lens core, easing
- * to 0 at the radius so substitution and deformation never pop.
- */
-export function rimSoftness(distance: number, radius: number): number {
-  const edge = Math.min(asciiScene.softEdge, Math.max(0, radius));
-  const inner = radius - edge;
-  if (distance <= inner) return 1;
-  if (distance >= radius) return 0;
-  const t = (distance - inner) / edge;
-  return 1 - t * t * (3 - 2 * t);
+/** Binary activation: no partially substituted glyphs at the circle's rim. */
+export function lensMask(distance: number, radius: number): number {
+  return distance >= 0 && distance < radius ? 1 : 0;
 }
 
 /** A compact, smooth lens: cells return exactly to their anchors outside it. */
@@ -143,19 +109,16 @@ export function distortPoint(
   pointer: Point,
   radius: number,
   intensity: number,
-): Point & { weight: number; zoom: number; softness: number } {
+): Point & { weight: number; zoom: number } {
   const dx = point.x - pointer.x;
   const dy = point.y - pointer.y;
   const distance = Math.hypot(dx, dy);
   const falloff = Math.max(0, 1 - distance / radius);
-  const softness = rimSoftness(distance, radius);
-  const weight =
-    falloff * falloff * softness * Math.max(0, Math.min(1, intensity));
+  const weight = falloff * falloff * Math.max(0, Math.min(1, intensity));
   return {
     x: point.x + dx * weight * 0.3,
     y: point.y + dy * weight * 0.3,
     weight,
-    softness,
     zoom: 1 + weight * 0.18,
   };
 }

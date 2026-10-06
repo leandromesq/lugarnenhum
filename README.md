@@ -15,8 +15,8 @@ Páginas: `/`, `/musica/`, `/loja/`, `/quem-somos/` e `/presskit/`.
 
 - `src/data/band.ts`: anúncio, biografia provisória, navegação e lançamentos. Adicione `listenUrl` aos lançamentos quando os links oficiais estiverem disponíveis.
 - `src/components/SiteShell.tsx`: estrutura compartilhada das páginas.
-- `src/components/ReleaseCarousel.tsx`: trilho contínuo dos CDs com seleção responsiva, perspectiva, teclado, gestos e lista de faixas expansível.
-- `src/components/MobiusModel.tsx`: modelo GLB na home, carregamento sob demanda, giro inicial lento e fidget com arraste/toque, momentum e fricção. Hover não pausa; após 3s sem interação volta suavemente à pose e ao giro padrão. Setas giram e Escape para. Respeita movimento reduzido, sem botão.
+- `src/components/ReleaseCarousel.tsx`: trilho contínuo dos CDs com seleção responsiva, perspectiva, teclado, gestos e lista de faixas expansível. A composição considera a altura disponível, mantendo metadados e controles livres da navegação em telas baixas.
+- `src/components/MobiusModel.tsx`: modelo GLB preto na home com contorno branco via `OutlinePass`, carregamento sob demanda, giro inicial lento e fidget com arraste/toque, momentum e fricção. Hover não pausa; após 3s sem interação volta suavemente à pose e ao giro padrão. Setas giram e Escape para. Respeita movimento reduzido, sem botão. A dica temporária “Arraste para girar” desaparece após 5s ou ao interagir.
 - `src/lib/mobius-physics.ts`: direção, velocidade de arraste e integração da inércia independente da taxa de quadros.
 - `src/components/DiscFace.tsx`: logo, título e duração sobre os seis acabamentos iridescentes do Pencil; Inter Medium Italic hospedada localmente só nos rótulos.
 - `src/components/BandPhoto.tsx`: fotografias distintas para desktop e celular.
@@ -49,10 +49,10 @@ npm run test:browser
 
 ## Assets do design
 
-Para regenerar WebP e ícones a partir dos arquivos de imagem exportados pelo Pencil (incluindo `symbol-dark.webp`, que muda apenas as cores neutras e preserva os bonecos):
+Para regenerar fotos, logos oficiais e favicon a partir do Pencil: os ícones preto e branco são arquivos distintos, sem inversão ou alteração das cores dos bonecos. A logo escrita original é preta; sua versão branca mantém o mesmo desenho e transparência. `prepare-brand-assets.mjs` usa os PNGs oficiais ao lado do `.pen`.
 
 ```sh
-node scripts/prepare-design-assets.mjs "caminho/para/lugarnenhum-assets"
+node scripts/prepare-design-assets.mjs "caminho/para/lugarnenhum-assets" "caminho/para/os/logos-oficiais"
 ```
 
 As fontes são hospedadas localmente: Roboto Mono com licença em `src/app/fonts/LICENSE.txt`, e Inter nos rótulos dos CDs com licença em `src/app/fonts/Inter-LICENSE.txt`. A tipografia de interface usa Consolas com fallback para Courier New.

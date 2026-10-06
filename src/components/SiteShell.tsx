@@ -17,7 +17,9 @@ export function SiteShell({ children, variant }: SiteShellProps) {
         Pular para o conteúdo
       </a>
       <Announcement text={band.announcement} />
-      {variant !== "about" && <Brand symbol={variant === "home"} />}
+      {variant !== "about" && (
+        <Brand symbol={variant === "home"} dark={variant === "shop"} />
+      )}
       <main id="conteudo" tabIndex={-1}>
         {children}
       </main>

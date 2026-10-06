@@ -8,18 +8,13 @@ import {
   projectPoint,
   hoverCharacter,
   hoverTargets,
-  rimSoftness,
-  stepHover,
-  stepHoverAmount,
+  lensMask,
 } from "../src/lib/ascii-scene.ts";
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 0.000001, `${a} != ${b}`);
 
-test("Interaction radius and transition timings match the approved refinement", () => {
+test("The dry interaction keeps the approved 55px radius", () => {
   assert.equal(asciiScene.radius, 55);
-  assert.ok(asciiScene.softEdge >= 10 && asciiScene.softEdge <= 12);
-  assert.equal(asciiScene.enterMs, 100);
-  assert.equal(asciiScene.leaveMs, 220);
 });
 
 for (const [width, height] of [
@@ -67,9 +62,9 @@ test("Lens pushes characters outward only inside the interaction radius", () => 
   const lens = distortPoint({ x: 40, y: 0 }, { x: 0, y: 0 }, 120, 1);
   assert.ok(lens.x > 40 && lens.x < 52);
   assert.ok(lens.zoom > 1 && lens.zoom <= 1.18);
-  assert.ok(lens.weight > 0 && lens.softness > 0);
+  assert.ok(lens.weight > 0);
   const outside = distortPoint({ x: 130, y: 0 }, { x: 0, y: 0 }, 120, 1);
-  assert.deepEqual(outside, { x: 130, y: 0, weight: 0, softness: 0, zoom: 1 });
+  assert.deepEqual(outside, { x: 130, y: 0, weight: 0, zoom: 1 });
 });
 
 test("Lens is stable at its center and returns precisely to the base scene", () => {
@@ -82,21 +77,13 @@ test("Lens is stable at its center and returns precisely to the base scene", () 
   assert.equal(inactive.zoom, 1);
 });
 
-test("Rim softness eases the outer band into the rest of the scene", () => {
-  const radius = 120;
-  const inner = radius - asciiScene.softEdge;
-  assert.equal(rimSoftness(0, radius), 1);
-  assert.equal(rimSoftness(inner, radius), 1);
-  close(rimSoftness(inner + asciiScene.softEdge / 2, radius), 0.5);
-  assert.equal(rimSoftness(radius, radius), 0);
-  assert.equal(rimSoftness(radius + 20, radius), 0);
-  // Monotonic and exactly zero at the boundary.
-  const band = [inner, inner + 3, inner + 6, inner + 9, radius];
-  for (let index = 1; index < band.length; index++) {
-    assert.ok(
-      rimSoftness(band[index], radius) < rimSoftness(band[index - 1], radius),
-    );
-  }
+test("The entire lens activates fully until a hard boundary with no radial fade", () => {
+  const radius = asciiScene.radius;
+  for (const distance of [0, 20, radius - 11, radius - 0.001])
+    assert.equal(lensMask(distance, radius), 1);
+  for (const distance of [radius, radius + 0.001, radius + 20])
+    assert.equal(lensMask(distance, radius), 0);
+  assert.equal(lensMask(0, 0), 0);
 });
 
 test("Glitch replacements use richer alphabets while keeping approximate density", () => {
@@ -116,25 +103,4 @@ test("Glitch replacements use richer alphabets while keeping approximate density
   for (const character of asciiScene.characters) {
     assert.notEqual(hoverCharacter(character, 0), character);
   }
-});
-
-test("Radial hover amounts retain their exit animation instead of snapping to zero", () => {
-  close(stepHoverAmount(1, 0, 110), 0.5);
-  close(stepHoverAmount(0.5, 0, 110), 0);
-  close(stepHoverAmount(0, 0.5, 50), 0.5);
-  close(stepHoverAmount(0.5, 0.5, 1000), 0.5);
-});
-
-test("Hover transition settles, stays stable, and reverses smoothly", () => {
-  // Entry is roughly 100ms, the return is a calmer 220ms.
-  close(stepHover(0, true, 50), 0.5);
-  close(stepHover(0.5, true, 50), 1);
-  close(stepHover(1, true, 5000), 1);
-  close(stepHover(1, false, 110), 0.5);
-  close(stepHover(0.5, false, 110), 0);
-  close(stepHover(0, false, 5000), 0);
-  close(stepHover(0.5, false, 55), 0.25);
-  close(stepHover(0.25, true, 25), 0.5);
-  close(stepHover(0, true, 100), 1);
-  assert.ok(stepHover(1, false, 100) > 0);
 });

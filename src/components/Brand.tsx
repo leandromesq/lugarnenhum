@@ -5,9 +5,14 @@ import { assetPath } from "@/lib/assets";
 interface BrandProps {
   symbol?: boolean;
   centered?: boolean;
+  dark?: boolean;
 }
 
-export function Brand({ symbol = false, centered = false }: BrandProps) {
+export function Brand({
+  symbol = false,
+  centered = false,
+  dark = false,
+}: BrandProps) {
   return (
     <div className={`brand ${centered ? "brand--centered" : ""}`}>
       <Link
@@ -16,7 +21,7 @@ export function Brand({ symbol = false, centered = false }: BrandProps) {
         aria-label="Lugar Nenhum, página inicial"
       >
         <Image
-          src={assetPath("/assets/pencil/wordmark.webp")}
+          src={assetPath(`/assets/pencil/wordmark${dark ? "-dark" : ""}.webp`)}
           alt="Lugar Nenhum"
           loading="eager"
           width={900}

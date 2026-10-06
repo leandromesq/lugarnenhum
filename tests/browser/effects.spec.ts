@@ -59,6 +59,88 @@ test("Hovered ASCII glitches asynchronously under a stationary pointer and resto
   expect(await raster(page)).toBe(original);
 });
 
+test("Fisheye replaces whole edge glyphs without clipping them into the original layer", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "Mouse interaction is desktop-only.",
+  );
+  await page.goto("/");
+  const canvas = page.locator("canvas.home-ascii");
+  await expect(canvas).toHaveAttribute("data-ready", "true");
+  await page.evaluate(() => document.fonts.ready);
+  const original = await raster(page);
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    const traced = element as HTMLCanvasElement & { circleClips: number };
+    traced.circleClips = 0;
+    const context = element.getContext("2d")!;
+    const clip = context.clip.bind(context);
+    context.clip = () => {
+      traced.circleClips++;
+      clip();
+    };
+  });
+  await page.mouse.move(840, 570);
+  await page.waitForTimeout(900);
+  const differences = await canvas.evaluate(
+    async (element: HTMLCanvasElement, source) => {
+      const image = new Image();
+      image.src = source;
+      await image.decode();
+      const baseline = document.createElement("canvas");
+      baseline.width = element.width;
+      baseline.height = element.height;
+      const context = baseline.getContext("2d")!;
+      context.drawImage(image, 0, 0);
+      const before = context.getImageData(
+        0,
+        0,
+        element.width,
+        element.height,
+      ).data;
+      const after = element
+        .getContext("2d")!
+        .getImageData(0, 0, element.width, element.height).data;
+      const rect = element.getBoundingClientRect();
+      const ratio = element.width / rect.width;
+      let inside = 0;
+      let outside = 0;
+      let crossesFormerBoundary = 0;
+      for (let y = 0; y < element.height; y++) {
+        for (let x = 0; x < element.width; x++) {
+          const index = (y * element.width + x) * 4;
+          const changed =
+            before[index] !== after[index] ||
+            before[index + 1] !== after[index + 1] ||
+            before[index + 2] !== after[index + 2] ||
+            before[index + 3] !== after[index + 3];
+          if (!changed) continue;
+          const distance = Math.hypot(
+            (x + 0.5) / ratio + rect.left - 840,
+            (y + 0.5) / ratio + rect.top - 570,
+          );
+          if (distance > 55) crossesFormerBoundary++;
+          if (distance > 105) outside++;
+          else inside++;
+        }
+      }
+      return {
+        inside,
+        outside,
+        crossesFormerBoundary,
+        circleClips: (element as HTMLCanvasElement & { circleClips: number })
+          .circleClips,
+      };
+    },
+    original,
+  );
+  expect(differences.inside).toBeGreaterThan(0);
+  expect(differences.outside).toBe(0);
+  expect(differences.crossesFormerBoundary).toBeGreaterThan(0);
+  expect(differences.circleClips).toBe(0);
+});
+
 test("ASCII and photo use the same responsive viewport", async ({
   page,
 }, testInfo) => {
