@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lugar Nenhum
 
-## Getting Started
+Site da banda, implementado a partir do documento `lugarnenhum.pen` no Pencil. Next.js App Router, React e TypeScript, com exportação estática para GitHub Pages.
 
-First, run the development server:
+## Desenvolvimento
 
-```bash
+```sh
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Páginas: `/`, `/musica/`, `/loja/`, `/quem-somos/` e `/presskit/`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Conteúdo e arquitetura
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `src/data/band.ts`: anúncio, biografia provisória, navegação e lançamentos. Adicione `listenUrl` aos lançamentos quando os links oficiais estiverem disponíveis.
+- `src/components/SiteShell.tsx`: estrutura compartilhada das páginas.
+- `src/components/ReleaseCarousel.tsx`: interação dos CDs, com teclado e gestos.
+- `src/components/BandPhoto.tsx`: fotografias distintas para desktop e celular.
+- `src/components/AsciiOverlay.tsx`: ASCII interativo em Canvas, com fallback SVG, cache da cena estática e respeito a movimento reduzido.
+- `src/lib/ascii-scene.ts`: coordenadas da foto original, projeção `cover` e lente radial. Foto e ASCII compartilham a escala e o recorte; não posicione os caracteres com unidades independentes de viewport.
+- `src/components/Announcement.tsx`: faixa de anúncio com rolagem contínua e controle de pausa.
+- `src/app/globals.css`: tokens e composição responsiva do design.
+- `public/assets/pencil/`: fotos e logos otimizados em WebP.
+- `PRODUCT.md` e `DESIGN.md`: referência de produto e identidade visual.
 
-## Learn More
+Música e loja são provisórias. A biografia mantém Lorem ipsum por decisão do proprietário. Não há playback ou checkout simulados.
 
-To learn more about Next.js, take a look at the following resources:
+## Validação
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sh
+npm run lint
+npm run typecheck
+npm run format:check
+npm run build
+npm run test
+npx playwright install chromium
+npm run test:browser
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`test` valida a exportação já construída em `out/`. `test:browser` verifica desktop e celular, navegação, carregamento das imagens, teclado e carrossel; inicia um servidor em `127.0.0.1:3001` se necessário.
 
-## Deploy on Vercel
+`npm run format` aplica a formatação. O workflow de deploy verifica código e exportação antes de publicar.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Assets do design
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Para regenerar WebP e ícones a partir dos arquivos de imagem exportados pelo Pencil:
+
+```sh
+node scripts/prepare-design-assets.mjs "caminho/para/lugarnenhum-assets"
+```
+
+A fonte Roboto Mono é hospedada localmente, com sua licença em `src/app/fonts/LICENSE.txt`. A tipografia de interface usa Consolas com fallback para Courier New.
+
+## Hospedagem
+
+O build usa `output: "export"` e gera `out/`. No GitHub Actions, `basePath` e URLs de assets recebem `/lugarnenhum`. Fora dele, o site funciona na raiz do domínio. Nenhum domínio ou contato fictício foi configurado.
