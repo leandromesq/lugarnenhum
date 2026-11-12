@@ -4,6 +4,8 @@ import { band } from "../../src/data/band";
 test("Music keeps its closed tracklist and metadata above navigation on short screens", async ({
   page,
 }) => {
+  // Six cold loads of the WebGL scene; software rendering in CI is slow.
+  test.slow();
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const [width, height] of [
     [320, 568],

@@ -1,5 +1,17 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { releases } from "../../src/data/band";
+
+/** Scrolls the page so below-the-fold lazy images start loading. */
+async function scrollThroughLazyImages(page: Page) {
+  await page.evaluate(async () => {
+    const step = Math.round(innerHeight / 2);
+    for (let y = 0; y < document.body.scrollHeight; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    window.scrollTo(0, 0);
+  });
+}
 
 for (const route of ["/", "/musica/", "/loja/", "/quem-somos/", "/presskit/"]) {
   test(`${route} renders without broken assets, runtime errors, or horizontal overflow`, async ({
@@ -12,6 +24,7 @@ for (const route of ["/", "/musica/", "/loja/", "/quem-somos/", "/presskit/"]) {
     await expect(
       page.getByRole("navigation", { name: "Navegação principal" }),
     ).toBeVisible();
+    if (route === "/presskit/") await scrollThroughLazyImages(page);
     await expect
       .poll(() =>
         page.evaluate(() =>
@@ -47,20 +60,22 @@ test("CD carousel supports buttons, direct selection, arrows, and wraparound", a
   page,
 }) => {
   await page.goto("/musica/");
-  const active = page.locator('.disc[aria-pressed="true"]');
-  const name = (index: number) => `Selecionar ${releases[index].title}`;
-  await expect(active).toHaveAccessibleName(name(0));
+  const heading = page.locator(".release-details__copy h2");
+  await expect(heading).toHaveText(releases[0].title);
   await page.getByRole("button", { name: "Próximo lançamento" }).click();
-  await expect(active).toHaveAccessibleName(name(1));
+  await expect(heading).toHaveText(releases[1].title);
   await page.getByRole("button", { name: "Lançamento anterior" }).click();
-  await expect(active).toHaveAccessibleName(name(0));
-  await page.getByRole("button", { name: name(1), exact: true }).click();
-  await expect(active).toHaveAccessibleName(name(1));
-  await active.focus();
-  for (const index of [...releases.slice(2).map((_, index) => index + 2), 0]) {
+  await expect(heading).toHaveText(releases[0].title);
+  await page.getByRole("button", { name: "Próximo lançamento" }).focus();
+  for (const index of [...releases.slice(1).map((_, index) => index + 1), 0]) {
     await page.keyboard.press("ArrowRight");
-    await expect(active).toHaveAccessibleName(name(index));
+    await expect(heading).toHaveText(releases[index].title);
   }
+  await page.locator(".tracklist summary").click();
+  await page
+    .getByRole("button", { name: `Ir para ${releases[2].title}`, exact: true })
+    .click();
+  await expect(heading).toHaveText(releases[2].title);
 });
 
 test("Skip link is keyboard accessible", async ({ page }) => {

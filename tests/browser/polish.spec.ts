@@ -1,11 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { releases } from "../../src/data/band";
 
-const active = '.disc[aria-pressed="true"]';
-
-test("Tracklist selects a distant song directly without a serial animation queue", async ({
-  page,
-}) => {
+test("Tracklist selects a distant song directly", async ({ page }) => {
   await page.goto("/musica/");
   await page.locator(".tracklist summary").click();
   await expect(page.locator(".tracklist")).toHaveAttribute("open", "");
@@ -14,17 +10,10 @@ test("Tracklist selects a distant song directly without a serial animation queue
   await page
     .getByRole("button", { name: `Ir para ${song.title}`, exact: true })
     .click();
-  await expect(page.locator(active)).toHaveAccessibleName(
-    `Selecionar ${song.title}`,
+  await expect(page.locator(".release-details__copy h2")).toHaveText(
+    song.title,
   );
-  await expect(page.locator(".disc-track")).toHaveAttribute(
-    "data-moving",
-    "false",
-  );
-  await expect(page.locator(".disc-track")).toHaveAttribute(
-    "data-rebasing",
-    "false",
-  );
+  await expect(page.locator(".carousel-count")).toHaveText("05 / 06");
   await expect(
     page.getByRole("button", { name: `Ir para ${song.title}`, exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -33,36 +22,37 @@ test("Tracklist selects a distant song directly without a serial animation queue
   );
 });
 
-test("Carousel has soft edges, inclined side discs and a metadata fade", async ({
+test("Music keeps a metadata fade and a black fallback behind a circular label", async ({
   page,
 }) => {
   await page.goto("/musica/");
   const styles = await page.evaluate(() => {
-    const stage = document.querySelector(".disc-stage")!;
-    const selected = document.querySelector('.disc[aria-pressed="true"]')!;
-    const next = document.querySelector(
-      '.disc[data-side="right"][data-visible="true"]',
-    )!;
+    const stage = getComputedStyle(document.querySelector(".disc-stage")!);
+    const fallback = getComputedStyle(
+      document.querySelector(".disc-fallback")!,
+    );
+    const shell = getComputedStyle(
+      document.querySelector(".site-shell--music")!,
+    );
     return {
-      mask: getComputedStyle(stage).maskImage,
-      selected: getComputedStyle(selected).transform,
-      side: getComputedStyle(next).transform,
-      duration: getComputedStyle(document.querySelector(".disc-track")!)
-        .transitionDuration,
+      mask: stage.maskImage,
+      overflow: stage.overflow,
+      cursor: stage.cursor,
+      radius: fallback.borderRadius,
+      width: fallback.width,
+      background: shell.backgroundColor,
       metadata: getComputedStyle(
         document.querySelector(".release-details__transition")!,
       ).animationName,
     };
   });
-  expect(styles.mask).toContain("linear-gradient");
-  expect(styles.side).toContain("matrix3d");
-  expect(styles.selected).not.toBe(styles.side);
+  expect(styles.mask).toBe("none");
+  expect(styles.overflow).toBe("visible");
+  expect(styles.cursor).toBe("pointer");
+  expect(styles.radius).toBe("50%");
+  expect(parseFloat(styles.width)).toBeGreaterThan(100);
+  expect(styles.background).toBe("rgb(8, 9, 9)");
   expect(styles.metadata).toBe("release-copy-in");
-  await page.getByRole("button", { name: "Próximo lançamento" }).click();
-  await expect(page.locator(".disc-track")).toHaveCSS(
-    "transition-duration",
-    "0.45s",
-  );
 });
 
 test("Secondary links contain only the confirmed Instagram and presskit", async ({
@@ -180,55 +170,4 @@ test("Official brand assets use dedicated black and white files without shop inv
     "src",
     /\/wordmark\.webp$/,
   );
-});
-
-test("The six Pencil finishes retain their ordered colours, logo and song labels", async ({
-  page,
-}) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/musica/");
-  const colours = [
-    "#a6cced",
-    "#4bd268",
-    "#cdcbcb",
-    "#c5da5f",
-    "#83c0aa",
-    "#ff94df",
-  ];
-  for (let index = 0; index < releases.length; index++) {
-    const disc = page.locator('.disc[aria-pressed="true"]');
-    await expect(disc).toHaveClass(new RegExp(`disc--edition-${index}`));
-    await expect(disc.locator(".disc__title")).toHaveText(
-      releases[index].title,
-    );
-    await expect(disc.locator(".disc__format")).toHaveText(
-      releases[index].duration,
-    );
-    const style = await disc.evaluate((element) => ({
-      colour: getComputedStyle(element)
-        .getPropertyValue("--disc-light-a")
-        .trim(),
-      coating: getComputedStyle(element, "::before").mixBlendMode,
-      hub: getComputedStyle(element.querySelector(".disc__hub")!)
-        .backgroundImage,
-    }));
-    expect(style.colour).toBe(colours[index]);
-    expect(style.coating).toBe("hue");
-    expect(style.hub).toContain("linear-gradient");
-    await expect(disc.locator(".disc__title")).toHaveCSS(
-      "font-style",
-      "italic",
-    );
-    await expect(disc.locator(".disc__title")).toHaveCSS("font-weight", "500");
-    await expect
-      .poll(() =>
-        disc
-          .locator(".disc__wordmark img")
-          .evaluate(
-            (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
-          ),
-      )
-      .toBe(true);
-    await page.getByRole("button", { name: "Próximo lançamento" }).click();
-  }
 });

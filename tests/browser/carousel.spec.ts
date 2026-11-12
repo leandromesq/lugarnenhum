@@ -1,224 +1,202 @@
 import { expect, test } from "@playwright/test";
-import { releases } from "../../src/data/band";
+import type { Page } from "@playwright/test";
+import { band, releases } from "../../src/data/band";
 
-const track = ".disc-track";
-const active = '.disc[aria-pressed="true"]';
-const name = (index: number) => `Selecionar ${releases[index].title}`;
-const loop = [...releases.slice(1), releases[0]];
+const counter = ".carousel-count";
+const heading = ".release-details__copy h2";
+const stage = ".disc-stage";
+const preview = ".preview-button";
+const announcement = ".announcement__link";
+const countOf = (index: number) =>
+  `${String(index + 1).padStart(2, "0")} / ${String(releases.length).padStart(2, "0")}`;
 
-test("The entire CD track slides left with the selected disc centered", async ({
+async function stageBox(page: Page) {
+  const box = await page.locator(stage).boundingBox();
+  if (!box) throw new Error("Disc stage is not laid out");
+  return box;
+}
+
+test("Previous and next buttons move through the releases and wrap around", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/musica/");
-  const startSlot = Number(
-    await page.locator(active).getAttribute("data-slot"),
-  );
-  const sample = () =>
-    page.evaluate(
-      (slots) =>
-        slots.map((slot) => {
-          const rect = document
-            .querySelector(`[data-slot="${slot}"]`)!
-            .parentElement!.getBoundingClientRect();
-          return rect.x + rect.width / 2;
-        }),
-      [startSlot, startSlot + 1],
-    );
-  const before = await sample();
+  await expect(page.locator(heading)).toHaveText(releases[0].title);
+  await expect(page.locator(counter)).toHaveText(countOf(0));
   await page.getByRole("button", { name: "Próximo lançamento" }).click();
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "true");
-  await expect(page.locator(active)).toHaveAccessibleName(name(1));
-  // Selection updates before the first CSS animation frame is painted.
-  await expect
-    .poll(async () => (await sample())[0])
-    .toBeLessThan(before[0] - 1);
-  const during = await sample();
-  expect(
-    Math.abs(during[0] - before[0] - (during[1] - before[1])),
-  ).toBeLessThan(1);
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
-  await expect(page.locator(active)).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /^Selecionar / })).toHaveCount(
-    3,
+  await expect(page.locator(heading)).toHaveText(releases[1].title);
+  await expect(page.locator(counter)).toHaveText(countOf(1));
+  await page.getByRole("button", { name: "Lançamento anterior" }).click();
+  await expect(page.locator(heading)).toHaveText(releases[0].title);
+  await page.getByRole("button", { name: "Lançamento anterior" }).click();
+  await expect(page.locator(heading)).toHaveText(
+    releases[releases.length - 1].title,
   );
-  const centers = await page.evaluate(
-    (names) => {
-      const center = (name: string) => {
-        const button = [
-          ...document.querySelectorAll<HTMLButtonElement>(".disc"),
-        ].find(
-          (disc) =>
-            disc.getAttribute("aria-label") === name &&
-            disc.getAttribute("aria-hidden") !== "true",
-        )!;
-        const rect = button.getBoundingClientRect();
-        return rect.x + rect.width / 2;
-      };
-      return {
-        previous: center(names[0]),
-        active: center(names[1]),
-        next: center(names[2]),
-        width: innerWidth,
-      };
-    },
-    [name(0), name(1), name(2)],
-  );
-  expect(centers.previous).toBeLessThan(centers.active);
-  expect(centers.next).toBeGreaterThan(centers.active);
-  expect(Math.abs(centers.active - centers.width / 2)).toBeLessThan(1);
+  await expect(page.locator(counter)).toHaveText(countOf(releases.length - 1));
+  await page.getByRole("button", { name: "Próximo lançamento" }).click();
+  await expect(page.locator(counter)).toHaveText(countOf(0));
 });
 
-test("All six titles and durations appear in order and wrap continuously", async ({
+test("Arrow keys change the release from the carousel controls", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/musica/");
-  for (const release of [...loop, releases[1]]) {
-    await page.getByRole("button", { name: "Próximo lançamento" }).click();
-    await expect(page.locator(active)).toHaveAccessibleName(
-      `Selecionar ${release.title}`,
-    );
-    await expect(page.locator(`${active} .disc__format`)).toHaveText(
-      release.duration,
-    );
-    await expect(page.locator(".release-details__copy h2")).toHaveText(
-      release.title,
-    );
-    await expect(page.locator(".release-details__copy p")).toContainText(
-      release.duration,
-    );
-    await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
-  }
-  await page.getByRole("button", { name: "Lançamento anterior" }).click();
-  await expect(page.locator(active)).toHaveAccessibleName(name(0));
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
-  await page.getByRole("button", { name: "Lançamento anterior" }).click();
-  await expect(page.locator(active)).toHaveAccessibleName(
-    name(releases.length - 1),
-  );
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
+  await page.getByRole("button", { name: "Próximo lançamento" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(heading)).toHaveText(releases[1].title);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(heading)).toHaveText(releases[2].title);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(heading)).toHaveText(releases[1].title);
+  await expect(page.locator(counter)).toHaveText(countOf(1));
+});
+
+test("A tracklist button selects its release", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/musica/");
+  await page.locator(".tracklist summary").click();
+  await expect(page.locator(".tracklist")).toHaveAttribute("open", "");
+  await expect(page.locator(".tracklist button")).toHaveCount(releases.length);
+  const song = releases[4];
+  await page
+    .getByRole("button", { name: `Ir para ${song.title}`, exact: true })
+    .click();
+  await expect(page.locator(heading)).toHaveText(song.title);
+  await expect(page.locator(counter)).toHaveText(countOf(4));
   await expect(
-    page.getByRole("button", { name: name(0), exact: true }),
-  ).toHaveCount(1);
-  await expect(page.locator(".carousel-count")).toHaveText("06 / 06");
-});
-
-test("CDs never cover the arrow buttons, including short screens", async ({
-  page,
-}, testInfo) => {
-  const viewports =
-    testInfo.project.name === "mobile"
-      ? [
-          { width: 320, height: 568 },
-          { width: 390, height: 844 },
-        ]
-      : [
-          { width: 1920, height: 1080 },
-          { width: 1024, height: 768 },
-          { width: 1024, height: 600 },
-        ];
-  for (const viewport of viewports) {
-    await page.setViewportSize(viewport);
-    await page.goto("/musica/");
-    const stage = await page.locator(".disc-stage").boundingBox();
-    for (const arrow of await page.locator(".carousel-controls button").all()) {
-      await arrow.scrollIntoViewIfNeeded();
-      const rect = await arrow.boundingBox();
-      expect(stage!.y + stage!.height).toBeLessThanOrEqual(rect!.y);
-      expect(
-        await arrow.evaluate((button) => {
-          const rect = button.getBoundingClientRect();
-          return button.contains(
-            document.elementFromPoint(
-              rect.x + rect.width / 2,
-              rect.y + rect.height / 2,
-            ),
-          );
-        }),
-      ).toBe(true);
-    }
-    await page.getByRole("button", { name: "Próximo lançamento" }).click();
-    await expect(page.locator(active)).toHaveAccessibleName(name(1));
-  }
-});
-
-test("The selected CD overlaps and always paints above its neighbours", async ({
-  page,
-}) => {
-  await page.goto("/musica/");
-  const layering = await page.evaluate(() => {
-    const selected = document.querySelector<HTMLButtonElement>(
-      '.disc[aria-pressed="true"]',
-    )!;
-    const cursor = Number(selected.dataset.slot);
-    const rect = selected.getBoundingClientRect();
-    return [-1, 1].map((direction) => {
-      const neighbour = document.querySelector<HTMLButtonElement>(
-        `[data-slot="${cursor + direction}"]`,
-      )!;
-      const side = neighbour.getBoundingClientRect();
-      const left = Math.max(rect.left, side.left);
-      const right = Math.min(rect.right, side.right);
-      return {
-        overlap: right - left,
-        selectedOnTop: selected.contains(
-          document.elementFromPoint(
-            (left + right) / 2,
-            rect.y + rect.height / 2,
-          ),
-        ),
-        selectedLayer: Number(getComputedStyle(selected.parentElement!).zIndex),
-        sideLayer: Number(getComputedStyle(neighbour.parentElement!).zIndex),
-      };
-    });
-  });
-  for (const side of layering) {
-    expect(side.overlap).toBeGreaterThan(20);
-    expect(side.selectedOnTop).toBe(true);
-    expect(side.selectedLayer).toBeGreaterThan(side.sideLayer);
-  }
-});
-
-test("Rapid inputs preserve selection; desktop horizontal scrolling advances it", async ({
-  page,
-}, testInfo) => {
-  await page.goto("/musica/");
-  const next = page.getByRole("button", { name: "Próximo lançamento" });
-  for (let i = 0; i < 4; i++) await next.click();
-  await expect(page.locator(active)).toHaveAccessibleName(name(4));
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
-  if (testInfo.project.name === "mobile") return;
-  const stage = await page.locator(".disc-stage").boundingBox();
-  await page.mouse.move(
-    stage!.x + stage!.width / 2,
-    stage!.y + stage!.height / 2,
+    page.getByRole("button", { name: `Ir para ${song.title}`, exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".release-details__copy p")).toContainText(
+    song.duration,
   );
-  await page.mouse.wheel(130, 0);
-  await expect(page.locator(active)).toHaveAccessibleName(name(5));
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
 });
 
-test("Enabling reduced motion during a transition never locks navigation", async ({
+test("The 3D stage becomes ready and its canvas covers the whole page", async ({
   page,
 }) => {
   await page.goto("/musica/");
-  await page.getByRole("button", { name: "Próximo lançamento" }).click();
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "true");
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
-  await page.getByRole("button", { name: "Próximo lançamento" }).click();
-  await expect(page.locator(active)).toHaveAccessibleName(name(2));
+  await expect(page.locator(stage)).toHaveAttribute("data-state", "ready", {
+    timeout: 15000,
+  });
+  const boxes = await page.evaluate(() => {
+    const proj = (element: Element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const bar = document.querySelector(".announcement")!;
+    return {
+      main: proj(document.querySelector("main")!),
+      canvas: proj(document.querySelector(".disc-canvas")!),
+      // The canvas starts right below the announcement bar (hidden on mobile).
+      bar: bar.getBoundingClientRect().height,
+    };
+  });
+  expect(Math.abs(boxes.canvas.x - boxes.main.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(boxes.canvas.width - boxes.main.width)).toBeLessThanOrEqual(
+    2,
+  );
+  expect(
+    Math.abs(boxes.canvas.y - (boxes.main.y + boxes.bar)),
+  ).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(
+      boxes.canvas.y + boxes.canvas.height - (boxes.main.y + boxes.main.height),
+    ),
+  ).toBeLessThanOrEqual(2);
+  await expect(page.locator(".disc-canvas")).toHaveCSS(
+    "pointer-events",
+    "none",
+  );
 });
 
-test("Reduced motion still allows continuous navigation without animation", async ({
+test("Clicking the empty side or first stacked disc advances and the centre plays", async ({
   page,
 }) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/musica/");
-  for (const release of loop) {
-    await page.getByRole("button", { name: "Próximo lançamento" }).click();
-    await expect(page.locator(active)).toHaveAccessibleName(
-      `Selecionar ${release.title}`,
+  await expect(page.locator(stage)).toHaveAttribute("data-state", "ready", {
+    timeout: 15000,
+  });
+  const box = await stageBox(page);
+  const centre = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.click(centre + box.width * 0.42, y);
+  await expect(page.locator(counter)).toHaveText(countOf(1));
+  const disc = await page.locator(".disc-fallback").boundingBox();
+  await page.mouse.click(Math.max(2, centre - disc!.width), y);
+  await expect(page.locator(counter)).toHaveText(countOf(2));
+  await page.mouse.click(centre, y);
+  await expect(page.locator(preview)).toHaveAttribute("aria-pressed", "true");
+});
+
+test("The preview button plays and pauses the 15 second excerpt", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/musica/");
+  const button = page.locator(preview);
+  const audio = page.locator("audio");
+  await expect(button).toHaveAttribute("aria-pressed", "false");
+  await expect(button).toHaveText("▶ OUVIR PRÉVIA");
+  await expect(page.locator(".preview-note")).toHaveText(
+    "PRÉVIA DE 15S · GUIA NÃO FINALIZADA",
+  );
+  await expect(audio).toHaveAttribute(
+    "src",
+    new RegExp(`${releases[0].id}\\.mp3$`),
+  );
+  await button.click();
+  await expect(button).toHaveText("❚❚ PAUSAR");
+  await expect
+    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused))
+    .toBe(false);
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+
+  if (testInfo.project.name === "desktop") {
+    await expect(page.locator(announcement)).toHaveAttribute(
+      "aria-label",
+      `TOCANDO AGORA - LUGAR NENHUM - ${releases[0].title.toUpperCase()}.WAV`,
     );
-    await expect(page.locator(track)).toHaveAttribute("data-moving", "false");
+    await page.getByRole("button", { name: "Próximo lançamento" }).click();
+    await expect(audio).toHaveAttribute(
+      "src",
+      new RegExp(`${releases[1].id}\\.mp3$`),
+    );
+    await expect(page.locator(announcement)).toHaveAttribute(
+      "aria-label",
+      `TOCANDO AGORA - LUGAR NENHUM - ${releases[1].title.toUpperCase()}.WAV`,
+    );
+    await expect
+      .poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused))
+      .toBe(false);
   }
+
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "false");
+  await expect(button).toHaveText("▶ OUVIR PRÉVIA");
+  await expect
+    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused))
+    .toBe(true);
+  if (testInfo.project.name === "desktop")
+    await expect(page.locator(announcement)).toHaveAttribute(
+      "aria-label",
+      band.announcement,
+    );
+});
+
+test("Reduced motion still allows continuous navigation", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/musica/");
+  for (const [index, release] of releases.entries()) {
+    if (index)
+      await page.getByRole("button", { name: "Próximo lançamento" }).click();
+    await expect(page.locator(heading)).toHaveText(release.title);
+    await expect(page.locator(counter)).toHaveText(countOf(index));
+  }
+  await page.getByRole("button", { name: "Próximo lançamento" }).click();
+  await expect(page.locator(counter)).toHaveText(countOf(0));
 });

@@ -1,128 +1,125 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type {
-  CSSProperties,
-  KeyboardEvent,
-  PointerEvent,
-  TransitionEvent,
-} from "react";
-import type { Release } from "@/data/band";
-import { DiscFace } from "@/components/DiscFace";
-import { rebaseCursor, selectionSteps, wrapIndex } from "@/lib/carousel";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChangeEvent, CSSProperties, KeyboardEvent } from "react";
+import { assetPath } from "@/lib/assets";
+import { previewPath, type Release } from "@/data/band";
+import { DiscStage } from "@/components/DiscStage";
+import { setNowPlaying } from "@/lib/now-playing";
+import { selectionSteps, wrapIndex } from "@/lib/carousel";
+import { DEFAULT_VOLUME, PreviewAudio } from "@/lib/preview-audio";
+import "./preview-player.css";
 
 interface ReleaseCarouselProps {
   releases: readonly Release[];
 }
-interface TrackState {
-  cursor: number;
-  start: number;
-  moving: boolean;
-  rebasing: boolean;
-}
 
 export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
   const count = releases.length;
-  const initial = count > 1 ? count : 0;
-  const [track, setTrack] = useState<TrackState>({
-    cursor: initial,
-    start: initial,
-    moving: false,
-    rebasing: false,
-  });
-  const trackState = useRef(track);
-  const pendingSteps = useRef(0);
-  const frame = useRef(0);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const railRef = useRef<HTMLDivElement>(null);
-  const pointerStart = useRef<{ x: number; y: number; id: number } | null>(
-    null,
+  const [cursor, setCursor] = useState(0);
+  // Playback intent (the button) is separate from what is actually sounding.
+  const [playing, setPlaying] = useState(false);
+  const [soundingId, setSoundingId] = useState<string | null>(null);
+  const [failedPreview, setFailedPreview] = useState<string | null>(null);
+  const [progress, setProgress] = useState({ id: "", value: 0 });
+  const [volume, setVolume] = useState(DEFAULT_VOLUME * 100);
+  const [initialSrc] = useState(() =>
+    releases[0] ? assetPath(previewPath(releases[0])) : undefined,
   );
-  const didSwipe = useRef(false);
-  const activeIndex = wrapIndex(track.cursor, count);
-  const release = releases[activeIndex];
-  const cycles = count > 1 ? [0, 1, 2] : [0];
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const playerRef = useRef<PreviewAudio | null>(null);
+  const playingRef = useRef(false);
+  const volumeRef = useRef(DEFAULT_VOLUME * 100);
+  const releasesRef = useRef(releases);
+  const activeIndex = wrapIndex(cursor, count);
+  const release: Release | undefined = releases[activeIndex];
+  const releaseId = release?.id;
+  const previewError = failedPreview === releaseId;
+  const progressValue = progress.id === releaseId ? progress.value : 0;
+  const sounding = playing && soundingId === releaseId;
 
-  function update(next: TrackState) {
-    trackState.current = next;
-    setTrack(next);
-  }
+  useEffect(() => {
+    releasesRef.current = releases;
+  }, [releases]);
 
-  function advance() {
-    const current = trackState.current;
-    if (current.rebasing || !pendingSteps.current || count < 2) return;
-    // Finish a clone-boundary crossing before rebasing. Within the middle copy,
-    // retarget the ongoing CSS transition immediately instead of queuing steps.
-    if (
-      current.moving &&
-      (current.cursor < count || current.cursor >= count * 2)
-    )
-      return;
-    const steps = pendingSteps.current;
-    pendingSteps.current = 0;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const cursor = rebaseCursor(current.cursor + steps, count);
-      update({ cursor, start: cursor, moving: false, rebasing: false });
-      settle();
+  const activeReleaseRef = useRef(release);
+  useEffect(() => {
+    activeReleaseRef.current = release;
+  }, [release]);
+
+  const applyPlaying = useCallback((next: boolean) => {
+    playingRef.current = next;
+    setPlaying(next);
+  }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const player = new PreviewAudio(audio, {
+      onAudibleChange: (id) => {
+        setSoundingId(id);
+        const item = id
+          ? releasesRef.current.find((entry) => entry.id === id)
+          : undefined;
+        setNowPlaying(item?.title ?? null);
+      },
+      onError: (id) => {
+        applyPlaying(false);
+        setSoundingId(null);
+        setFailedPreview(id);
+      },
+    });
+    playerRef.current = player;
+    player.setVolume(volumeRef.current / 100);
+    return () => {
+      playerRef.current = null;
+      player.dispose();
+      setNowPlaying(null);
+    };
+  }, [applyPlaying]);
+
+  // Follow navigation only while playback is intended. A paused carousel can
+  // be browsed freely without the next preview starting on its own.
+  useEffect(() => {
+    if (!playingRef.current || !releaseId) return;
+    const player = playerRef.current;
+    const item = releasesRef.current.find((entry) => entry.id === releaseId);
+    if (!player || !item) return;
+    player.select({ id: item.id, src: assetPath(previewPath(item)) });
+  }, [releaseId]);
+
+  const move = useCallback((steps: number) => {
+    setCursor((current) => current + steps);
+  }, []);
+
+  const togglePreview = useCallback(() => {
+    const player = playerRef.current;
+    const item = activeReleaseRef.current;
+    if (!player || !item) return;
+    if (playingRef.current) {
+      player.pause();
+      applyPlaying(false);
       return;
     }
-    update({
-      cursor: current.cursor + steps,
-      start: current.moving ? current.start : current.cursor,
-      moving: true,
-      rebasing: false,
-    });
-  }
-
-  function move(steps: number) {
-    pendingSteps.current += steps;
-    if (count > 1) pendingSteps.current %= count;
-    advance();
-  }
+    setFailedPreview(null);
+    applyPlaying(true);
+    player.play({ id: item.id, src: assetPath(previewPath(item)) });
+  }, [applyPlaying]);
 
   function select(index: number) {
-    const destination = wrapIndex(
-      trackState.current.cursor + pendingSteps.current,
-      count,
+    setCursor(
+      (current) =>
+        current + selectionSteps(wrapIndex(current, count), index, count),
     );
-    move(selectionSteps(destination, index, count));
-  }
-
-  function settle() {
-    const cursor = rebaseCursor(trackState.current.cursor, count);
-    const focusWasOnDisc = railRef.current?.contains(document.activeElement);
-    cancelAnimationFrame(frame.current);
-    update({ cursor, start: cursor, moving: false, rebasing: true });
-    // Offscreen copies have identical neighbours. Paint the unanimated rebase
-    // before enabling hover transitions or applying the latest queued intent.
-    frame.current = requestAnimationFrame(() => {
-      if (focusWasOnDisc)
-        railRef.current
-          ?.querySelector<HTMLButtonElement>(`.disc[data-slot="${cursor}"]`)
-          ?.focus({ preventScroll: true });
-      frame.current = requestAnimationFrame(() => {
-        frame.current = 0;
-        update({ ...trackState.current, rebasing: false });
-        advance();
-      });
-    });
-  }
-
-  function handleTransitionEnd(event: TransitionEvent<HTMLDivElement>) {
-    if (
-      event.target === event.currentTarget &&
-      event.propertyName === "transform" &&
-      trackState.current.moving
-    )
-      settle();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    const target = event.target as HTMLElement;
     if (
       event.altKey ||
       event.ctrlKey ||
       event.metaKey ||
-      (event.target as HTMLElement).closest(".tracklist")
+      target.closest(".tracklist, .volume-control")
     )
       return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
@@ -131,52 +128,24 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
     }
   }
 
-  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
-    const start = pointerStart.current;
-    if (!start || start.id !== event.pointerId) return;
-    pointerStart.current = null;
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
-      didSwipe.current = true;
-      move(dx < 0 ? 1 : -1);
-    }
+  function handleVolumeChange(event: ChangeEvent<HTMLInputElement>) {
+    const next = Number(event.target.value);
+    setVolume(next);
+    volumeRef.current = next;
+    playerRef.current?.setVolume(next / 100);
   }
 
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
-
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    let accumulated = 0;
-    function wheel(event: WheelEvent) {
-      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
-      event.preventDefault();
-      if (trackState.current.moving) {
-        accumulated = 0;
-        return;
-      }
-      accumulated += event.deltaX * (event.deltaMode === 1 ? 16 : 1);
-      if (Math.abs(accumulated) >= 50) {
-        move(Math.sign(accumulated));
-        accumulated = 0;
-      }
-    }
-    const motion = matchMedia("(prefers-reduced-motion: reduce)");
-    function motionChanged() {
-      if (motion.matches && trackState.current.moving) settle();
-    }
-    stage.addEventListener("wheel", wheel, { passive: false });
-    motion.addEventListener("change", motionChanged);
-    return () => {
-      stage.removeEventListener("wheel", wheel);
-      motion.removeEventListener("change", motionChanged);
-    };
-  });
+  function handleTimeUpdate() {
+    const audio = audioRef.current;
+    if (!audio || !soundingId) return;
+    if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
+    setProgress({
+      id: soundingId,
+      value: Math.min(1, audio.currentTime / audio.duration),
+    });
+  }
 
   if (!release) return <p className="music-empty">Novas músicas em breve.</p>;
-  const visibleStart = Math.min(track.start, track.cursor) - 1;
-  const visibleEnd = Math.max(track.start, track.cursor) + 1;
 
   return (
     <section
@@ -185,79 +154,13 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
       aria-roledescription="carrossel"
       onKeyDown={handleKeyDown}
     >
-      <div
-        className="disc-stage"
-        ref={stageRef}
-        onPointerDown={(event) => {
-          if (event.isPrimary && event.button === 0) {
-            pointerStart.current = {
-              x: event.clientX,
-              y: event.clientY,
-              id: event.pointerId,
-            };
-            didSwipe.current = false;
-          }
-        }}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={() => {
-          pointerStart.current = null;
-        }}
-        onClickCapture={(event) => {
-          if (didSwipe.current) {
-            event.preventDefault();
-            event.stopPropagation();
-            didSwipe.current = false;
-          }
-        }}
-      >
-        <div
-          className="disc-track"
-          ref={railRef}
-          data-moving={track.moving}
-          data-rebasing={track.rebasing}
-          style={{ "--cursor": track.cursor } as CSSProperties}
-          onTransitionEnd={handleTransitionEnd}
-        >
-          {cycles.flatMap((cycle) =>
-            releases.map((item, index) => {
-              const slot = cycle * count + index;
-              const active = slot === track.cursor;
-              const exposed =
-                Math.abs(slot - track.cursor) <= 1 &&
-                (count > 2 || slot >= track.cursor);
-              return (
-                <div
-                  className="disc-slot"
-                  data-active={active}
-                  key={`${cycle}-${item.id}`}
-                >
-                  <button
-                    type="button"
-                    className={`disc disc--edition-${index % 6}`}
-                    data-slot={slot}
-                    data-active={active}
-                    data-side={
-                      slot < track.cursor
-                        ? "left"
-                        : slot > track.cursor
-                          ? "right"
-                          : "center"
-                    }
-                    data-visible={slot >= visibleStart && slot <= visibleEnd}
-                    onClick={() => select(index)}
-                    aria-label={`Selecionar ${item.title}`}
-                    aria-hidden={!exposed || undefined}
-                    aria-pressed={exposed ? active : undefined}
-                    tabIndex={exposed ? 0 : -1}
-                  >
-                    <DiscFace title={item.title} duration={item.duration} />
-                  </button>
-                </div>
-              );
-            }),
-          )}
-        </div>
-      </div>
+      <DiscStage
+        releases={releases}
+        cursor={cursor}
+        playing={sounding}
+        onStep={move}
+        onToggle={togglePreview}
+      />
       <div className="release-details">
         <div className="carousel-controls" aria-label="Controles do carrossel">
           <button
@@ -303,7 +206,58 @@ export function ReleaseCarousel({ releases }: ReleaseCarouselProps) {
             )}
           </div>
         </div>
-        <p className="carousel-hint">ESCOLHA UM CD. EXPLORE O SINAL.</p>
+        <div className="preview-controls">
+          <button
+            type="button"
+            className="preview-button"
+            aria-pressed={playing}
+            onClick={togglePreview}
+          >
+            {playing ? "❚❚ PAUSAR" : "▶ OUVIR PRÉVIA"}
+          </button>
+          <div className="volume-control">
+            <label htmlFor="preview-volume">Volume</label>
+            <input
+              id="preview-volume"
+              type="range"
+              aria-label="Volume"
+              min={0}
+              max={100}
+              step={1}
+              value={volume}
+              onChange={handleVolumeChange}
+              style={{ "--volume-fill": `${volume}%` } as CSSProperties}
+            />
+            <output htmlFor="preview-volume" aria-hidden="true">
+              {volume}%
+            </output>
+          </div>
+        </div>
+        <p className="preview-note">
+          {previewError
+            ? "Prévia indisponível."
+            : "PRÉVIA DE 15S · GUIA NÃO FINALIZADA"}
+        </p>
+        <span className="preview-progress" role="presentation">
+          <span style={{ width: `${progressValue * 100}%` }} />
+        </span>
+        {/* The player owns src after mount; this prop keeps the initial URL
+            stable so React never overwrites an imperative delayed swap. */}
+        <audio
+          ref={audioRef}
+          preload="none"
+          src={initialSrc}
+          onTimeUpdate={handleTimeUpdate}
+          onEnded={() => {
+            if (!releaseId || soundingId !== releaseId) return;
+            playerRef.current?.pause();
+            applyPlaying(false);
+            setProgress({ id: releaseId, value: 0 });
+          }}
+        />
+        <p className="carousel-hint">
+          ESCOLHA UM CD. CLIQUE NO DISCO PARA OUVIR.
+        </p>
         <details className="tracklist">
           <summary>VER FAIXAS</summary>
           <ol>
