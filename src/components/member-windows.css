@@ -1,0 +1,176 @@
+.member-layer {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.member-hotspot {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.member-hotspot:focus-visible {
+  outline: 2px solid var(--color-paper);
+  outline-offset: 2px;
+}
+
+.member-hotspot__marker {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: #0026ff;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  transition: transform 150ms var(--ease-out);
+}
+
+.member-hotspot:hover .member-hotspot__marker,
+.member-hotspot:focus-visible .member-hotspot__marker {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+/* With a mouse the marker only appears over the person; touch has no hover,
+   so it stays visible there as the only affordance. */
+@media (hover: hover) and (pointer: fine) {
+  .member-hotspot__marker {
+    opacity: 0;
+    transition:
+      opacity 150ms var(--ease-out),
+      transform 150ms var(--ease-out);
+  }
+  .member-hotspot:is(:hover, :focus-visible, [aria-expanded="true"])
+    .member-hotspot__marker {
+    opacity: 1;
+  }
+}
+
+.member-window {
+  position: absolute;
+  width: min(320px, 80vw);
+  pointer-events: auto;
+  animation: member-window-in 150ms var(--ease-out) both;
+}
+
+@media (min-width: 768px) {
+  .member-window {
+    left: var(--member-center);
+    bottom: var(--member-bottom);
+    transform: translateX(-50%);
+  }
+
+  .member-window[data-placement="below"] {
+    top: var(--member-top);
+    bottom: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .member-window {
+    position: fixed;
+    z-index: 35;
+    left: 5%;
+    right: 5%;
+    bottom: calc(220px + env(safe-area-inset-bottom));
+    width: auto;
+    transform: none;
+  }
+}
+
+.member-window__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 41px;
+  margin-right: -43px;
+  padding: 0 57px 0 23px;
+  background: #0026ff;
+  color: #fff;
+  clip-path: polygon(0 0, calc(100% - 43px) 0, 100% 100%, 0 100%);
+}
+
+@media (max-width: 767px) {
+  .member-window__bar {
+    margin-right: 0;
+  }
+}
+
+.member-window__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-style: italic;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-window__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.member-window__close:hover,
+.member-window__close:focus-visible {
+  background: rgb(255 255 255 / 20%);
+}
+
+.member-window__body {
+  padding: 14px 23px 16px;
+  border-radius: 0 0 10px 10px;
+  background: rgb(8 9 9 / 58%);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.member-window__role {
+  margin: 0 0 8px;
+}
+
+.member-window__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* Animate `translate` so the desktop centering `transform` is preserved. */
+@keyframes member-window-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}

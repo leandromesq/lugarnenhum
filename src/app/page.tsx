@@ -1,6 +1,8 @@
 import { BandPhoto } from "@/components/BandPhoto";
 import { SiteShell } from "@/components/SiteShell";
 import { AsciiOverlay } from "@/components/AsciiOverlay";
+import { MemberWindows } from "@/components/MemberWindows";
+import { members } from "@/data/band";
 
 export default function HomePage() {
   return (
@@ -9,6 +11,7 @@ export default function HomePage() {
       <div className="home-scene">
         <BandPhoto scene="home" />
         <AsciiOverlay />
+        <MemberWindows members={members} />
       </div>
       <div className="home-fade" aria-hidden="true" />
     </SiteShell>
