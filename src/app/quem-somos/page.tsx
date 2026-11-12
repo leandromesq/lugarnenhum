@@ -29,10 +29,7 @@ export default function AboutPage() {
       <h1 className="sr-only">Quem somos: Lugar Nenhum</h1>
       <BandPhoto scene="about" />
       <Brand centered />
-      <section
-        className="about-copy"
-        aria-label="Sobre a banda, texto provisório"
-      >
+      <section className="about-copy" aria-label="Sobre a banda">
         <Biography side="left" paragraphs={band.biography.slice(0, split)} />
         <Biography side="right" paragraphs={band.biography.slice(split)} />
       </section>

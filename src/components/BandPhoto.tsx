@@ -16,8 +16,8 @@ export function BandPhoto({ scene }: BandPhotoProps) {
         src={assetPath(`/assets/pencil/${scene}-desktop.webp`)}
         alt={
           scene === "home"
-            ? "Os quatro integrantes do Lugar Nenhum diante de uma fachada, à noite."
-            : "Os integrantes do Lugar Nenhum em uma colina gramada, sob o céu azul."
+            ? "Os quatro integrantes da Lugar Nenhum diante de uma fachada, à noite."
+            : "Os integrantes da Lugar Nenhum em uma colina gramada, sob o céu azul."
         }
         fetchPriority="high"
       />

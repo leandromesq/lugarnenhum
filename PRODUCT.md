@@ -8,7 +8,7 @@ brand
 Fans discovering Lugar Nenhum and returning listeners looking for music, merchandise, and information about the band.
 
 ## Product Purpose
-Implement the band's approved Pencil document as a navigable website. The home and about compositions are the source of truth, including separate mobile imagery. Music and shop are provisional references, confirmed by the owner; use a simple CD carousel for music. Keep Lorem ipsum on the about page until the owner supplies the biography.
+Implement the band's approved Pencil document as a navigable website. The home and about compositions are the source of truth, including separate mobile imagery. Music and shop are provisional references, confirmed by the owner; use a simple CD carousel for music.
 
 ## Brand Personality
 Photographic, pixelated, playful. The band's actual photos, ASCII wordmark, illustrated symbol, and blue announcement strip establish the voice.
