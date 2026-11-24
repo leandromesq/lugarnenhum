@@ -19,6 +19,9 @@ jobs:
     # PRs from forks get a read-only token; this workflow is for the band's own branches.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    env:
+      # Build for the site root so the local server serves the same paths the tests expect.
+      NEXT_PUBLIC_BASE_PATH: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
