@@ -2,6 +2,10 @@
 
 Site da banda, implementado a partir do documento `lugarnenhum.pen` no Pencil. Next.js App Router, React e TypeScript, com exportação estática para GitHub Pages.
 
+## Colaboração
+
+Design e código trabalham com agentes pelo GitHub: issues com o template "Mudança de design", PRs com screenshots automáticos e o design versionado em `design/`. As regras estão no [`AGENTS.md`](AGENTS.md) e o fluxo de design em [`design/README.md`](design/README.md).
+
 ## Desenvolvimento
 
 ```sh
