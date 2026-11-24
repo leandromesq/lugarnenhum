@@ -4,7 +4,7 @@ O design do site nasce no Figma, ganha uma cópia no Pencil e só depois vira c�
 
 ## Figma
 
-- Arquivo: _cole aqui o link do arquivo do Figma_
+- Arquivo: [LUGAR NENHUM](https://www.figma.com/design/S2lNLB5zJqWzbO1NbaA7WF/LUGAR-NENHUM)
 - Frames: PAGINA INICIAL, OUÇA NOSSA MUSICA, NOSSA LOJA, QUEM SOMOS e os frames CELULAR correspondentes.
 
 ## Pencil
