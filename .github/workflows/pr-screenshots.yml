@@ -1,0 +1,61 @@
+name: Screenshots do PR
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-screenshots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check code
+        run: npm run lint && npm run typecheck && npm run format:check
+      - name: Build static site
+        run: npm run build
+      - name: Test static export
+        run: npm run test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture pages
+        run: |
+          python3 -m http.server 4173 --directory out >/dev/null 2>&1 &
+          npx --yes wait-on@8.0.3 http://127.0.0.1:4173/
+          node scripts/capture-screenshots.mjs http://127.0.0.1:4173 screenshots
+      - name: Upload screenshots
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-pr-${{ github.event.pull_request.number }}
+          path: screenshots
+          retention-days: 30
+      - name: Comment on the PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ steps.upload.outputs.artifact-url }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          body="**Screenshots** do commit ${SHA::7}: todas as páginas em desktop (1920×1080) e celular (iPhone 13), página inteira.
+
+          [Baixar os screenshots]($URL)
+
+          Para revisar o design, compare com os frames do Figma e comente aqui a página, o viewport e o que deveria ser diferente."
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body "$body" ||
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"

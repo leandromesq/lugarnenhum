@@ -1,0 +1,41 @@
+name: Mudança de design
+description: Uma alteração visual feita no Figma para implementar no site.
+title: "design: "
+labels: [design]
+body:
+  - type: textarea
+    id: mudanca
+    attributes:
+      label: O que mudou
+      description: Descreva a mudança e o motivo. Diga o que deve continuar igual.
+    validations:
+      required: true
+  - type: textarea
+    id: figma
+    attributes:
+      label: Frames no Figma
+      description: Links dos frames alterados (botão direito no frame → Copy link to selection).
+    validations:
+      required: true
+  - type: textarea
+    id: exports
+    attributes:
+      label: Exports
+      description: Arraste aqui os PNGs exportados dos frames, de desktop e de celular.
+    validations:
+      required: true
+  - type: checkboxes
+    id: paginas
+    attributes:
+      label: Páginas afetadas
+      options:
+        - label: Início
+        - label: Música
+        - label: Loja
+        - label: Quem somos
+        - label: Presskit
+  - type: textarea
+    id: assets
+    attributes:
+      label: Imagens, fontes ou textos novos
+      description: Anexe os arquivos originais, ou diga onde estão.
