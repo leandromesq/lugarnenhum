@@ -37,8 +37,13 @@ try {
       await page.goto(new URL(path, base).href, { waitUntil: "networkidle" });
       // Let lazy WebGL scenes and fonts settle before the capture.
       await page.waitForTimeout(2500);
-      const file = join(outDir, `${pageName}-${viewportName}.png`);
-      await page.screenshot({ path: file, fullPage: true });
+      const file = join(outDir, `${pageName}-${viewportName}.jpg`);
+      await page.screenshot({
+        path: file,
+        fullPage: true,
+        type: "jpeg",
+        quality: 80,
+      });
       console.log(file);
       await page.close();
     }

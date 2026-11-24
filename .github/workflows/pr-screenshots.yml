@@ -1,10 +1,13 @@
 name: Screenshots do PR
 
+# Captures every page on desktop and mobile for each PR, stores the images on the
+# `screenshots` branch and shows them inline in a PR comment for the designer.
+
 on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 concurrency:
@@ -13,6 +16,8 @@ concurrency:
 
 jobs:
   screenshots:
+    # PRs from forks get a read-only token; this workflow is for the band's own branches.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,25 +42,51 @@ jobs:
           python3 -m http.server 4173 --directory out >/dev/null 2>&1 &
           npx --yes wait-on@8.0.3 http://127.0.0.1:4173/
           node scripts/capture-screenshots.mjs http://127.0.0.1:4173 screenshots
-      - name: Upload screenshots
-        id: upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots-pr-${{ github.event.pull_request.number }}
-          path: screenshots
-          retention-days: 30
+      - name: Publish images to the screenshots branch
+        id: publish
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          dir="pr-$PR/${SHA::7}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin screenshots >/dev/null; then
+            git fetch --depth=1 origin screenshots
+            git worktree add ../shots FETCH_HEAD
+          else
+            git worktree add --orphan -b screenshots ../shots
+          fi
+          mkdir -p "../shots/$dir"
+          cp screenshots/*.jpg "../shots/$dir/"
+          git -C ../shots add "$dir"
+          git -C ../shots commit -q -m "screenshots: PR #$PR at ${SHA::7}"
+          git -C ../shots push origin HEAD:screenshots
+          echo "base=https://raw.githubusercontent.com/$GITHUB_REPOSITORY/screenshots/$dir" >> "$GITHUB_OUTPUT"
       - name: Comment on the PR
-        if: github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-          URL: ${{ steps.upload.outputs.artifact-url }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ steps.publish.outputs.base }}
+          DESIGNER: ${{ vars.DESIGNER }}
         run: |
-          body="**Screenshots** do commit ${SHA::7}: todas as páginas em desktop (1920×1080) e celular (iPhone 13), página inteira.
-
-          [Baixar os screenshots]($URL)
-
-          Para revisar o design, compare com os frames do Figma e comente aqui a página, o viewport e o que deveria ser diferente."
-          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body "$body" ||
-            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
+          mention=""
+          [ -n "$DESIGNER" ] && mention="@$DESIGNER, "
+          {
+            echo "## Screenshots"
+            echo
+            echo "${mention}estas são as páginas do site com as mudanças deste PR (versão ${SHA::7}). Compare com o Figma e responda aqui: **Aprovado**, ou uma linha por ajuste com a página, computador ou celular, e o que deveria mudar."
+            echo
+            for page in inicio:Início musica:Música loja:Loja quem-somos:"Quem somos" presskit:Presskit; do
+              id=${page%%:*}; name=${page#*:}
+              echo "<details$([ "$id" = inicio ] && echo ' open')><summary><b>$name</b></summary>"
+              echo
+              echo "| Computador | Celular |"
+              echo "| --- | --- |"
+              echo "| <img src=\"$BASE/$id-desktop.jpg\" width=\"560\"> | <img src=\"$BASE/$id-celular.jpg\" width=\"220\"> |"
+              echo
+              echo "</details>"
+            done
+          } > comment.md
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file comment.md

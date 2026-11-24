@@ -1,6 +1,6 @@
 # Design
 
-O design do site nasce no Figma, ganha uma cópia no Pencil e só depois vira código. As regras de colaboração ficam no [`AGENTS.md`](../AGENTS.md).
+O design do site nasce no Figma, ganha uma cópia no Pencil e só depois vira código. O guia do designer é o [`COMO-PARTICIPAR.md`](COMO-PARTICIPAR.md), e as regras para os agentes ficam no [`AGENTS.md`](../AGENTS.md).
 
 ## Figma
 
@@ -16,6 +16,6 @@ O design do site nasce no Figma, ganha uma cópia no Pencil e só depois vira c�
 node scripts/prepare-design-assets.mjs design/assets design/assets
 ```
 
-## Pedir uma mudança
+## Por que exports e não o MCP do Figma
 
-Abra uma issue com o template **Mudança de design**. Exporte os frames alterados como PNG pelo Figma (Export → PNG 1x ou 2x) e anexe à issue. Os exports não gastam a cota do MCP do Figma, e os agentes conseguem ver as imagens.
+O designer anexa os frames exportados em PNG às issues. Os exports não gastam a cota do MCP gratuito do Figma, e qualquer agente consegue ver as imagens. O Leandro passa o design para o `.pen`, que os agentes leem pelo MCP do Pencil.

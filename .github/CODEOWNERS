@@ -1,7 +1,0 @@
-# Quem revisa o quê. O GitHub pede a revisão do dono quando um PR mexe nestes caminhos.
-# Troque DESIGNER pelo usuário do GitHub do designer e remova o comentário das linhas abaixo.
-
-*            @leandromesq
-# /design/     @DESIGNER
-# /DESIGN.md   @DESIGNER
-# /PRODUCT.md  @DESIGNER
